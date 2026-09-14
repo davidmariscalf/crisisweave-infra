@@ -24,6 +24,12 @@ jobs:
           sh -n backup.sh
           sh -n restore-drill.sh
           sh -n prepare-offsite-backup.sh
+          sh -n update-pinned-release.sh
+          if sh update-pinned-release.sh main >/tmp/cw-update-invalid.out 2>&1; then
+            echo 'release updater accepted a mutable branch name' >&2
+            exit 1
+          fi
+          grep -q 'exact lowercase 40-character Git commit SHA' /tmp/cw-update-invalid.out
       - name: Create ephemeral CI environment
         working-directory: deploy/stack
         run: |
