@@ -14,20 +14,22 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Validate helper scripts
         working-directory: deploy/stack
         run: |
           sh -n init.sh
           sh -n verify.sh
           sh -n bootstrap-admin.sh
+          sh -n backup.sh
+          sh -n restore-drill.sh
       - name: Create ephemeral CI environment
         working-directory: deploy/stack
         run: |
           cp .env.example .env
-          printf 'CW_API_HOST=http://localhost\n' >> .env
-          printf 'CW_TOKEN_PEPPER=%s\n' "$(openssl rand -hex 32)" >> .env
-          printf 'CW_WORKSITES_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env
+          sed -i 's|^CW_API_HOST=.*|CW_API_HOST=http://localhost|' .env
+          sed -i "s|^CW_TOKEN_PEPPER=.*|CW_TOKEN_PEPPER=$(openssl rand -hex 32)|" .env
+          sed -i "s|^CW_WORKSITES_TOKEN=.*|CW_WORKSITES_TOKEN=$(openssl rand -hex 32)|" .env
           chmod 600 .env
       - name: Validate Compose model
         working-directory: deploy/stack
@@ -52,6 +54,12 @@ jobs:
             sleep 2
           done
           exit 1
+      - name: Backup and non-destructive restore drill
+        working-directory: deploy/stack
+        run: |
+          backup_dir="$(sh backup.sh /tmp/crisisweave-ci-backups)"
+          test -n "$backup_dir"
+          sh restore-drill.sh "$backup_dir"
       - name: Tear down
         if: always()
         working-directory: deploy/stack
