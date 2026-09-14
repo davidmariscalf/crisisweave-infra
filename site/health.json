@@ -1,0 +1,6 @@
+{
+  "service": "crisisweave-public-site",
+  "status": "ok",
+  "scope": "static-public-site",
+  "synthetic_demo_only": true
+}
