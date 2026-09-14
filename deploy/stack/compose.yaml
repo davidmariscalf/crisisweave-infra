@@ -3,7 +3,7 @@ name: crisisweave
 services:
   worksites:
     build:
-      context: ${CW_WORKSITES_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-worksites.git#0bc11a3504f1829cc9aefde8f8b56525674c428a}
+      context: ${CW_WORKSITES_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-worksites.git#c91affa98d0a26547abeca10844e7adbad80ef18}
     restart: unless-stopped
     environment:
       CW_COORDINATOR_TOKEN: ${CW_WORKSITES_TOKEN:?CW_WORKSITES_TOKEN must be set in the local .env file}
