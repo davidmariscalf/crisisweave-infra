@@ -68,12 +68,12 @@ resource "oci_core_security_list" "crisisweave" {
     for_each = trimspace(var.ssh_public_key) == "" ? [] : [1]
     content {
       protocol = "6"
-      source   = "0.0.0.0/0"
+      source   = var.ssh_source_cidr
       tcp_options {
         min = 22
         max = 22
       }
-      description = "SSH enabled because an SSH public key was supplied"
+      description = "Restricted SSH enabled because an SSH public key was supplied"
     }
   }
 
