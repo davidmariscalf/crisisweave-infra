@@ -1,0 +1,4 @@
+Contact: mailto:useproqr@gmail.com
+Canonical: https://crisisweave.netlify.app/.well-known/security.txt
+Policy: https://github.com/davidmariscalf/crisisweave-platform/blob/main/SECURITY.md
+Preferred-Languages: en, es
