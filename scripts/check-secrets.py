@@ -9,7 +9,7 @@ SELF = Path(__file__).resolve()
 FORBIDDEN_NAMES = {".env", "id_rsa", "id_ed25519", "credentials.json", "secrets.json"}
 SKIP_DIRS = {".git", "__pycache__", "node_modules"}
 SENSITIVE_WORDS = ("api_key", "apikey", "token", "secret", "password", "private_key", "client_secret")
-PLACEHOLDERS = ("REPLACE_", "EXAMPLE", "CHANGEME", "${{", "<", "YOUR_")
+PLACEHOLDERS = ("REPLACE_", "EXAMPLE", "CHANGEME", "${", "<", "YOUR_")
 TEXT_SUFFIXES = {"", ".md", ".txt", ".json", ".yml", ".yaml", ".toml", ".py", ".js", ".ts", ".html", ".css", ".sh", ".ps1", ".example"}
 KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
 
