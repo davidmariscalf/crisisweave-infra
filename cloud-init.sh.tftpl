@@ -9,7 +9,7 @@ log() {
 
 log 'Installing Docker and required security tools'
 apt-get update
-apt-get install -y ca-certificates curl git openssl docker.io docker-compose-v2 ufw unattended-upgrades
+apt-get install -y ca-certificates curl git openssl age docker.io docker-compose-v2 ufw unattended-upgrades
 systemctl enable --now docker
 
 log 'Configuring automatic security updates without automatic reboots'
