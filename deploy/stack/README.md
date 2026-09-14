@@ -46,7 +46,7 @@ Verify:
 sh verify.sh
 ```
 
-The initializer creates two random 256-bit local secret files under ignored `secrets/` and never prints their values. Do not send those files through chat, email, issues, logs or Git.
+The initializer generates two random 256-bit values inside the ignored, mode-0600 local `.env` file and never prints them. Do not send that file through chat, email, issues, logs or Git. Docker administrators can inspect container environment variables and should therefore be treated as privileged host administrators; move runtime secrets to OpenBao or an equivalent secret manager for a real production deployment.
 
 ## Updates
 
