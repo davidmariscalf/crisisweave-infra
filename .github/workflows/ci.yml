@@ -1,0 +1,21 @@
+name: infra-ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject committed secrets
+        run: python scripts/check-secrets.py
+      - name: Validate required files
+        run: |
+          test -f site/index.html
+          test -f netlify.toml
+          test -f .env.example

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="CrisisWeave is an engineering prototype for crisis information and recovery coordination.">
+  <title>CrisisWeave</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0d1117;--panel:#151b23;--text:#e6edf3;--muted:#9da7b3;--line:#2b3440;--accent:#65b7ff;--safe:#48d597}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:880px;margin:auto;padding:72px 24px}.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:6px 11px;color:var(--safe);font-size:13px}h1{font-size:clamp(42px,8vw,78px);line-height:1;margin:24px 0 18px;letter-spacing:-.04em}p{color:var(--muted);max-width:720px}.lead{font-size:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:36px 0}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}.card h2{font-size:16px;margin:0 0 8px}.card p{font-size:14px;margin:0}a{color:var(--accent)}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-block;text-decoration:none;border-radius:10px;padding:11px 16px;border:1px solid var(--line);color:var(--text)}.primary{background:var(--text);color:var(--bg);border-color:var(--text)}footer{margin-top:62px;padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}</style>
+</head>
+<body><main class="wrap">
+  <span class="tag">Public engineering MVP</span>
+  <h1>CrisisWeave</h1>
+  <p class="lead">A modular prototype for turning fragmented crisis information into a provenance-preserving operational picture, while keeping volunteer recovery work explicit and separate from hazard inference.</p>
+  <div class="grid">
+    <section class="card"><h2>Coordinator view</h2><p>Incident evidence, provenance, verification and alert triage for information-management users.</p></section>
+    <section class="card"><h2>Volunteer work</h2><p>Concrete requested or assessed worksites with crew needs, skills, hazards and assignment state.</p></section>
+    <section class="card"><h2>Access boundary</h2><p>Organisation-scoped roles, hashed bearer tokens, private-data separation and audit through crisisweave-platform.</p></section>
+  </div>
+  <p><strong>Safety:</strong> CrisisWeave is not an emergency authority and must not be the sole source for evacuation, medical, fire, police or rescue decisions. The public demo uses synthetic data.</p>
+  <div class="actions"><a class="btn primary" href="https://github.com/davidmariscalf/CrisisWeave">View source architecture</a><a class="btn" href="https://github.com/davidmariscalf/crisisweave-platform">Platform boundary</a></div>
+  <footer>No API keys, bearer tokens or private survivor records are served by this static site.</footer>
+</main></body></html>
