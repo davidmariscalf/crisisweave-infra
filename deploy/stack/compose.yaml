@@ -41,7 +41,7 @@ services:
 
   platform:
     build:
-      context: ${CW_PLATFORM_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-platform.git#74ce5b52a1c9eedefdff992f7080b6532415213b}
+      context: ${CW_PLATFORM_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-platform.git#afb520b062958844bca5652871f57b1a433042fe}
     restart: unless-stopped
     init: true
     depends_on:
@@ -134,6 +134,7 @@ services:
       - --storage.tsdb.retention.time=${CW_PROMETHEUS_RETENTION:-15d}
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
     networks:
       - monitoring_internal
