@@ -1,6 +1,6 @@
 # CrisisWeave external component decisions
 
-CrisisWeave should not reimplement identity, secret management, encrypted backup, or SQLite disaster recovery from scratch. The pinned projects in `components.lock.json` are evaluated upstream components, not copied source dependencies.
+CrisisWeave should not reimplement identity, TLS automation, secret management, monitoring, encrypted backup, or SQLite disaster recovery from scratch. The pinned projects in `components.lock.json` are evaluated upstream components, not copied source dependencies.
 
 ## Adopt as deployment options
 
@@ -9,6 +9,10 @@ CrisisWeave should not reimplement identity, secret management, encrypted backup
 Use authentik as the external identity provider and MFA policy engine, speaking OAuth2/OIDC. Put oauth2-proxy at the HTTP authentication boundary when a deployment wants browser SSO without adding JWT/OIDC cryptography to the stdlib Python gateway.
 
 The CrisisWeave application must still enforce its own organisation and role permissions. Successful login is not equivalent to authorisation to mutate a worksite.
+
+### Caddy
+
+Use Caddy as the small-deployment TLS/reverse-proxy boundary in front of the backend. Keep application services on a private network and expose only the TLS edge. The checked-in example blocks `/metrics` from the public edge so internal Prometheus scraping does not become a new public information surface.
 
 ### OpenBao
 
@@ -24,6 +28,12 @@ Use Litestream for continuous disaster-recovery replication of single-writer SQL
 
 Use restic for encrypted snapshot backups of deployment state and for scheduled restore drills. A backup that has never been restored in a test environment is not considered a verified disaster-recovery plan.
 
+### Prometheus + blackbox_exporter
+
+Use Prometheus for central collection/alert evaluation and blackbox_exporter for external HTTP/TLS probes. `crisisweave-platform` now has an instrumented server with low-cardinality `/metrics` output. Do not expose that endpoint through the public edge or add identifiers/PII as metric labels.
+
+GitHub Actions continues to provide a separate simple public check for the Netlify site.
+
 ## Evaluated but not adopted
 
 ### rqlite
@@ -34,7 +44,7 @@ For a larger deployment, managed PostgreSQL or CloudNativePG should also be eval
 
 ### Upptime
 
-Upptime is useful for GitHub-based public status pages, but CrisisWeave already runs public endpoint checks in GitHub Actions. Adding a second monitoring framework now would duplicate capability rather than close a gap.
+Upptime is useful for GitHub-based public status pages, but CrisisWeave already runs public endpoint checks in GitHub Actions. Adding a second public monitoring framework now would duplicate capability rather than close a gap.
 
 ## Partner reference
 
