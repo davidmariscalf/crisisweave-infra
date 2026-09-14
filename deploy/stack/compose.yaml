@@ -9,7 +9,7 @@ x-json-logging: &json-logging
 services:
   worksites:
     build:
-      context: ${CW_WORKSITES_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-worksites.git#cd8e4c99602fea231b7b9209f2f2a0139645f93e}
+      context: ${CW_WORKSITES_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-worksites.git#c807498b79a050b4d17a040e58bc02fe53df3069}
     restart: unless-stopped
     init: true
     environment:
