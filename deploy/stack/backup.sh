@@ -78,17 +78,56 @@ docker cp "$worksites_id:$worksites_tmp" "$out/worksites.sqlite3" >/dev/null
 cleanup
 trap - EXIT INT TERM
 
+# Seal the ordered audit history independently of SQLite page layout. Details
+# are parsed and canonicalised so semantically identical JSON has one encoding.
+python3 - "$out/platform.sqlite3" "$out/AUDIT_SEAL.json" <<'PY'
+import hashlib
+import json
+import sqlite3
+import sys
+from pathlib import Path
+
+source, destination = map(Path, sys.argv[1:])
+con = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
+con.row_factory = sqlite3.Row
+try:
+    rows = con.execute(
+        "SELECT seq,at,organisation_id,principal_id,action,target,outcome,details "
+        "FROM audit ORDER BY seq"
+    ).fetchall()
+finally:
+    con.close()
+
+head = bytes(32)
+for row in rows:
+    item = dict(row)
+    try:
+        item["details"] = json.loads(item["details"])
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"audit row {item['seq']} contains invalid details JSON") from exc
+    encoded = json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    head = hashlib.sha256(head + b"\n" + encoded).digest()
+
+seal = {
+    "format": "crisisweave-audit-chain-v1",
+    "rows": len(rows),
+    "head_sha256": head.hex(),
+}
+destination.write_text(json.dumps(seal, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+PY
+
 (
   cd "$out"
-  sha256sum platform.sqlite3 private.sqlite3 worksites.sqlite3 > SHA256SUMS
+  sha256sum platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEAL.json > SHA256SUMS
 )
-chmod 600 "$out"/*.sqlite3 "$out/SHA256SUMS"
+chmod 600 "$out"/*.sqlite3 "$out/AUDIT_SEAL.json" "$out/SHA256SUMS"
 
 cat > "$out/METADATA" <<EOF
 created_at=$stamp
-format=crisisweave-stack-backup-v1
+format=crisisweave-stack-backup-v2
 platform_commit=9e7aa0d2aaaf2ecb36688e1632e50da4c1218563
 worksites_commit=cd8e4c99602fea231b7b9209f2f2a0139645f93e
+audit_seal=AUDIT_SEAL.json
 EOF
 chmod 600 "$out/METADATA"
 
