@@ -1,0 +1,27 @@
+name: validate-oci-free-stack
+
+on:
+  push:
+    branches: [oci-free-deploy]
+  pull_request:
+    branches: [oci-free-deploy]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.3
+      - name: Terraform format
+        run: terraform fmt -check -recursive
+      - name: Terraform init
+        run: terraform init -backend=false -input=false
+      - name: Terraform validate
+        run: terraform validate
+      - name: Validate bootstrap shell syntax
+        run: bash -n cloud-init.sh.tftpl

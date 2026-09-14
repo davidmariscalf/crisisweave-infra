@@ -22,19 +22,22 @@ fi
 
 cd /opt/crisisweave/infra/deploy/stack
 
-if [ ! -f .env ]; then
-  cp .env.example .env
-  token_pepper="$(openssl rand -hex 32)"
-  worksites_token="$(openssl rand -hex 32)"
-  cat >> .env <<EOF
-CW_API_HOST=${api_site}
-CW_ALLOWED_ORIGIN=${allowed_origin}
-CW_TOKEN_PEPPER=$token_pepper
-CW_WORKSITES_TOKEN=$worksites_token
-EOF
-  chmod 600 .env
-  unset token_pepper worksites_token
-fi
+# Reuse the repository initializer so secret generation has one implementation.
+sh init.sh
+
+set_env_value() {
+  key="$1"
+  value="$2"
+  tmp=".env.oci.$$"
+  grep -v "^$key=" .env > "$tmp" || true
+  printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" .env
+}
+
+set_env_value CW_API_HOST "${api_site}"
+set_env_value CW_ALLOWED_ORIGIN "${allowed_origin}"
+chmod 600 .env
 
 log 'Building and starting CrisisWeave'
 docker compose up -d --build
