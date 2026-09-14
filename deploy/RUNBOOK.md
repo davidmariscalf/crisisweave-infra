@@ -10,9 +10,26 @@ Domain request: `https://github.com/domainsproject/register/pull/191`
 
 The custom alias is not considered active until the registry request is accepted, DNS resolves, and the hostname is added to the Netlify project so TLS can be provisioned.
 
-## Backend
+## Backend quick path
 
-The backend is `crisisweave-platform`; `crisisweave-worksites` remains the operational state service behind it. The intended deployment order is:
+For a small Linux/VPS deployment, use `deploy/stack/` instead of starting each service manually:
+
+```bash
+git clone https://github.com/davidmariscalf/crisisweave-infra.git
+cd crisisweave-infra/deploy/stack
+sh init.sh
+# set CW_API_HOST in .env
+docker compose up -d --build
+sh verify.sh
+```
+
+The stack builds the reviewed application commits, starts `crisisweave-worksites` and `crisisweave-platform` on private networks, exposes only Caddy on public 80/443, and starts Prometheus plus blackbox_exporter on the monitoring network. `/metrics` is not exposed through the public Caddy route.
+
+`init.sh` generates random local token/pepper values without printing them. No default organisation, administrator or bearer token is created. Bootstrap deployment identities deliberately with `crisisweave-platform` after the host and access policy are under operator control; do not ship universal/default credentials.
+
+## Backend boundary
+
+The backend is `crisisweave-platform`; `crisisweave-worksites` remains the operational state service behind it. The intended hardening order is:
 
 1. private Docker network and encrypted persistent storage;
 2. `crisisweave-worksites` bound only to the private network;
@@ -24,8 +41,6 @@ The backend is `crisisweave-platform`; `crisisweave-worksites` remains the opera
 8. external identity/MFA via authentik and oauth2-proxy when browser SSO is enabled.
 
 Required secret material, especially `CW_TOKEN_PEPPER`, must be generated and injected by the deployment host. Never copy a generated value into this repository, a Docker image, a public issue, logs, or documentation.
-
-`/metrics` is intended for the private monitoring network and should not be exposed through the public Caddy route.
 
 ## Production boundary
 
