@@ -44,11 +44,23 @@ if [ "$target" = "$previous" ]; then
   exit 0
 fi
 
-# Fetch only repository-owned history and prove the target is on origin/main.
-git -C "$repo_root" fetch --no-tags --prune --depth 256 origin main "$target"
+# Refresh the canonical remote-tracking main branch. Bootstrap clones are
+# intentionally shallow, so unshallow once before proving ancestry.
+if [ "$(git -C "$repo_root" rev-parse --is-shallow-repository)" = "true" ]; then
+  git -C "$repo_root" fetch --no-tags --prune --unshallow origin \
+    '+refs/heads/main:refs/remotes/origin/main'
+else
+  git -C "$repo_root" fetch --no-tags --prune origin \
+    '+refs/heads/main:refs/remotes/origin/main'
+fi
+
+if ! git -C "$repo_root" cat-file -e "$target^{commit}" 2>/dev/null; then
+  echo "requested commit is not present in origin/main history" >&2
+  exit 1
+fi
 actual="$(git -C "$repo_root" rev-parse "$target^{commit}")"
 if [ "$actual" != "$target" ]; then
-  echo "fetched object does not match requested release SHA" >&2
+  echo "resolved object does not match requested release SHA" >&2
   exit 1
 fi
 if ! git -C "$repo_root" merge-base --is-ancestor "$target" origin/main; then
@@ -110,7 +122,7 @@ fi
 rollback() {
   echo "new release failed verification; rolling stack definition back to $previous" >&2
   git -C "$repo_root" checkout --detach --force "$previous" >/dev/null 2>&1 || true
-  cd "$repo_root/deploy/stack" || exit 1
+  cd "$repo_root/deploy/stack" || return 1
   docker compose up -d --build || true
   for _ in $(seq 1 30); do
     if sh verify.sh >/dev/null 2>&1; then
@@ -123,40 +135,56 @@ rollback() {
   return 1
 }
 
-trap 'rollback; exit 1' INT TERM HUP
+on_signal() {
+  trap - INT TERM HUP
+  rollback || true
+  exit 130
+}
+trap on_signal INT TERM HUP
 
 git -C "$repo_root" checkout --detach --force "$target"
-cd "$repo_root/deploy/stack"
 
-# The ignored local .env survives exact-commit checkout. Refuse to continue if
-# it is absent rather than regenerating secrets during an update.
-if [ ! -f .env ]; then
-  echo "target release has no local .env; refusing to regenerate deployment secrets" >&2
-  rollback
-  exit 1
-fi
-chmod 600 .env
+# Run every fallible apply operation inside one status-captured block so any
+# failure after switching revisions reaches rollback instead of leaving the
+# checkout half-applied.
+set +e
+(
+  set -eu
+  cd "$repo_root/deploy/stack"
 
-for helper in init.sh verify.sh bootstrap-admin.sh backup.sh restore-drill.sh prepare-offsite-backup.sh update-pinned-release.sh; do
-  sh -n "$helper"
-done
-
-docker compose config >/dev/null
-docker compose build --pull worksites platform
-docker compose up -d
-
-healthy=0
-for _ in $(seq 1 30); do
-  if sh verify.sh >/dev/null 2>&1; then
-    healthy=1
-    break
+  # The ignored local .env survives exact-commit checkout. Refuse to regenerate
+  # deployment secrets during an update.
+  if [ ! -f .env ]; then
+    echo "target release has no local .env; refusing to regenerate deployment secrets" >&2
+    exit 1
   fi
-  sleep 2
-done
+  chmod 600 .env
 
-if [ "$healthy" -ne 1 ]; then
-  rollback
-  exit 1
+  for helper in init.sh verify.sh bootstrap-admin.sh backup.sh restore-drill.sh prepare-offsite-backup.sh update-pinned-release.sh; do
+    sh -n "$helper"
+  done
+
+  docker compose config >/dev/null
+  docker compose build --pull worksites platform
+  docker compose up -d
+
+  healthy=0
+  for _ in $(seq 1 30); do
+    if sh verify.sh >/dev/null 2>&1; then
+      healthy=1
+      break
+    fi
+    sleep 2
+  done
+  [ "$healthy" -eq 1 ]
+)
+apply_status=$?
+set -e
+
+if [ "$apply_status" -ne 0 ]; then
+  trap - INT TERM HUP
+  rollback || true
+  exit "$apply_status"
 fi
 trap - INT TERM HUP
 
