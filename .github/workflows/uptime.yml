@@ -1,0 +1,18 @@
+name: public-uptime
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+permissions:
+  contents: read
+jobs:
+  check-public-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check homepage
+        run: |
+          curl --fail --silent --show-error --location --max-time 20 https://crisisweave.netlify.app/ | grep -q '<title>CrisisWeave</title>'
+      - name: Check health endpoint
+        run: |
+          curl --fail --silent --show-error --location --max-time 20 https://crisisweave.netlify.app/health.json | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"]=="ok" and d["synthetic_demo_only"] is True'
