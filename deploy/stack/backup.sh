@@ -88,7 +88,7 @@ cat > "$out/METADATA" <<EOF
 created_at=$stamp
 format=crisisweave-stack-backup-v1
 platform_commit=afb520b062958844bca5652871f57b1a433042fe
-worksites_commit=b3ef51e9537fe7b7d24ddef649d431923ceaab62
+worksites_commit=cd8e4c99602fea231b7b9209f2f2a0139645f93e
 EOF
 chmod 600 "$out/METADATA"
 
