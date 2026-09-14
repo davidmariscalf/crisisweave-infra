@@ -1,31 +1,38 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SELF = Path(__file__).resolve()
 FORBIDDEN_NAMES = {".env", "id_rsa", "id_ed25519", "credentials.json", "secrets.json"}
 SKIP_DIRS = {".git", "__pycache__", "node_modules"}
 SENSITIVE_WORDS = ("api_key", "apikey", "token", "secret", "password", "private_key", "client_secret")
 PLACEHOLDERS = ("REPLACE_", "EXAMPLE", "CHANGEME", "${{", "<", "YOUR_")
 TEXT_SUFFIXES = {"", ".md", ".txt", ".json", ".yml", ".yaml", ".toml", ".py", ".js", ".ts", ".html", ".css", ".sh", ".ps1", ".example"}
+KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
 
 def iter_files():
     for path in ROOT.rglob("*"):
-        if path.is_file() and not any(part in SKIP_DIRS for part in path.parts):
+        if path.is_file() and path.resolve() != SELF and not any(part in SKIP_DIRS for part in path.parts):
             yield path
 
 def suspicious_assignment(line: str) -> bool:
     stripped = line.strip()
     if not stripped or stripped.startswith("#"):
         return False
-    low = stripped.lower()
-    if not any(word in low for word in SENSITIVE_WORDS):
-        return False
     separator = "=" if "=" in stripped else ":" if ":" in stripped else None
     if not separator:
         return False
-    value = stripped.split(separator, 1)[1].strip().strip("'\"")
+    key, value = stripped.split(separator, 1)
+    key = key.strip()
+    value = value.strip().strip("'\"")
+    if not KEY_RE.fullmatch(key):
+        return False
+    low_key = key.lower()
+    if not any(word in low_key for word in SENSITIVE_WORDS):
+        return False
     if not value or any(marker in value.upper() for marker in PLACEHOLDERS):
         return False
     if value.startswith(("http://", "https://", "/")):
