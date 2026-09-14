@@ -12,6 +12,30 @@ This repository is deliberately safe to make public. It contains deployment meta
 
 The custom alias remains pending until the external domain registry accepts the pull request and DNS propagates.
 
+## One-command backend stack
+
+`deploy/stack/` is the reproducible Docker Compose baseline for a small Linux/VPS deployment. It combines:
+
+- `crisisweave-worksites` on a private application network
+- `crisisweave-platform` as the authenticated API boundary
+- Caddy 2.11.4 as the only public HTTP/TLS edge
+- Prometheus 3.14.0 and blackbox_exporter 0.28.0 on the private monitoring network
+- persistent Docker volumes for application state
+- non-root application containers, read-only root filesystems, dropped Linux capabilities and health/readiness checks
+
+The application build contexts are pinned to reviewed Git commit SHAs. CI builds the remote contexts and runs the full Compose stack before accepting the deployment baseline.
+
+```bash
+git clone https://github.com/davidmariscalf/crisisweave-infra.git
+cd crisisweave-infra/deploy/stack
+sh init.sh
+# edit .env and set CW_API_HOST
+docker compose up -d --build
+sh verify.sh
+```
+
+`init.sh` creates random backend secrets only inside the ignored local `.env` file with mode `0600` and never prints them. For a real production deployment, migrate runtime secret material to OpenBao or an equivalent managed secret store.
+
 ## Repository responsibilities
 
 - static public landing page and synthetic evaluator demos in `site/`
@@ -30,21 +54,26 @@ The custom alias remains pending until the external domain registry accepts the 
 
 - authentik for IdP/MFA/OIDC
 - oauth2-proxy for a maintained OIDC-aware HTTP authentication boundary
+- Caddy for the TLS/reverse-proxy edge
 - OpenBao for runtime secret/key management
 - Litestream for continuous SQLite disaster-recovery replication
 - restic for encrypted backup snapshots and restore drills
+- Prometheus + blackbox_exporter for internal metrics and readiness probes
 - rqlite as a future multi-node candidate only, not an active dependency
 - Crisis Cleanup's public web repository as a partner-model reference only
 
-These projects are **not automatically deployed** by cloning this repository. Their runbooks are under `deploy/`. No upstream source code is copied into CrisisWeave.
+The base stack deploys Caddy, Prometheus and blackbox_exporter. Identity, managed secrets and off-host disaster recovery remain opt-in because they require organisation-specific bootstrap/recovery configuration. No upstream source code is copied into CrisisWeave.
 
 ## Deployment profiles
 
+- `deploy/stack/` — current one-command backend baseline
 - `deploy/identity/` — external OIDC/MFA boundary without hand-written authentication cryptography
 - `deploy/secrets/` — runtime secret/KMS practices with OpenBao or an equivalent managed service
 - `deploy/dr/` — Litestream + restic disaster-recovery model and restore drill
+- `deploy/edge/` — standalone Caddy edge guidance
+- `deploy/observability/` — standalone Prometheus/blackbox guidance
 
-The profiles are opt-in and deliberately distinguish configuration readiness from production deployment.
+The profiles deliberately distinguish configuration readiness from production deployment.
 
 ## Netlify Drop
 
@@ -56,7 +85,7 @@ No Netlify token, API key or password is required inside this repository.
 
 Secrets belong in the hosting provider or a secret manager, never in Git.
 
-Required backend secret names are documented in `.env.example` using placeholders only. In particular, `CW_TOKEN_PEPPER` must be generated outside this repository and injected at runtime.
+Required backend secret names are documented with empty placeholders only. The local one-command stack stores generated development/small-deployment secrets in its ignored mode-0600 `.env`; a hardened production deployment should inject them from OpenBao or an equivalent provider.
 
 The CI workflow runs `scripts/check-secrets.py` and fails when it sees common token/key patterns or forbidden secret-bearing filenames. Environment-variable/placeholders are allowed only so configuration shape can be versioned without values.
 
