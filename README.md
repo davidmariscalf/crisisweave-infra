@@ -7,18 +7,27 @@ This repository is deliberately safe to make public. It contains deployment meta
 ## Public endpoints
 
 - Netlify origin: `https://crisisweave.netlify.app`
-- Requested public alias: `https://crisisweave.thedev.me`
+- Requested public alias: `https://crisisweave.owns.it.com`
+- Domain request: `https://github.com/domainsproject/register/pull/191`
 
-The `thedev.me` alias is managed through the upstream `thedev-me/register` project and may remain pending until its pull request is approved.
+The custom alias remains pending until the external domain registry accepts the pull request and DNS propagates.
 
 ## Repository responsibilities
 
 - static public landing page in `site/`
+- deploy-safe `_headers` and `_redirects` files inside the published directory
 - Netlify build and security-header configuration
+- public `health.json`, robots metadata, sitemap and `security.txt`
 - CI secret scanning and configuration checks
-- availability monitoring workflow
+- scheduled public availability checks without third-party API keys
 - deployment/runbook documentation
 - examples of required environment variable names without secret values
+
+## Netlify Drop
+
+If Netlify Drop is used, upload the **entire `site/` directory**, not only `index.html`. The directory contains `_headers`, `_redirects`, `health.json` and the other public deployment metadata that make the static deployment match the repository configuration.
+
+No Netlify token, API key or password is required inside this repository.
 
 ## Secret policy
 
