@@ -62,6 +62,9 @@ with urllib.request.urlopen('http://127.0.0.1:8080/metrics', timeout=3) as r:
 print('/metrics: ok')
 PY
 
+printf '%s\n' 'Checking audit immutability guards...'
+docker compose exec -T platform python audit_guard.py verify >/dev/null
+
 printf '%s\n' 'Checking internal Caddy readiness and metrics isolation...'
 docker compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8081/healthz
 if docker compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8081/metrics 2>/dev/null; then
