@@ -25,10 +25,29 @@ variable "ssh_public_key" {
   sensitive   = true
 }
 
+variable "ssh_source_cidr" {
+  description = "IPv4 CIDR allowed to reach SSH when an SSH public key is supplied. Ignored when SSH is disabled. Narrow this to your trusted public IP whenever possible."
+  type        = string
+  default     = "0.0.0.0/0"
+
+  validation {
+    condition     = can(cidrnetmask(var.ssh_source_cidr))
+    error_message = "ssh_source_cidr must be a valid IPv4 CIDR such as 203.0.113.10/32."
+  }
+}
+
 variable "api_hostname" {
   description = "Optional DNS hostname already pointing to the VM public IP. Leave blank for HTTP bootstrap on port 80; add DNS later before real sensitive data."
   type        = string
   default     = ""
+
+  validation {
+    condition = trimspace(var.api_hostname) == "" || (
+      !can(regex("[/:\\s]", trimspace(var.api_hostname))) &&
+      can(regex("^[A-Za-z0-9.-]+$", trimspace(var.api_hostname)))
+    )
+    error_message = "api_hostname must be blank or a plain DNS hostname without scheme, path, port, or whitespace."
+  }
 }
 
 variable "ocpus" {
