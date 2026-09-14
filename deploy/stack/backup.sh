@@ -87,7 +87,7 @@ chmod 600 "$out"/*.sqlite3 "$out/SHA256SUMS"
 cat > "$out/METADATA" <<EOF
 created_at=$stamp
 format=crisisweave-stack-backup-v1
-platform_commit=afb520b062958844bca5652871f57b1a433042fe
+platform_commit=9e7aa0d2aaaf2ecb36688e1632e50da4c1218563
 worksites_commit=cd8e4c99602fea231b7b9209f2f2a0139645f93e
 EOF
 chmod 600 "$out/METADATA"
