@@ -15,27 +15,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create ephemeral CI secrets
+      - name: Create ephemeral CI environment
         working-directory: deploy/stack
         run: |
-          mkdir -p secrets
-          openssl rand -hex 32 > secrets/cw_token_pepper
-          openssl rand -hex 32 > secrets/cw_worksites_token
-          chmod 600 secrets/*
+          cp .env.example .env
+          printf 'CW_API_HOST=http://localhost\n' >> .env
+          printf 'CW_TOKEN_PEPPER=%s\n' "$(openssl rand -hex 32)" >> .env
+          printf 'CW_WORKSITES_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env
+          chmod 600 .env
       - name: Validate Compose model
         working-directory: deploy/stack
-        env:
-          CW_API_HOST: http://localhost
         run: docker compose config >/tmp/crisisweave-compose.yml
       - name: Build application images
         working-directory: deploy/stack
-        env:
-          CW_API_HOST: http://localhost
         run: docker compose build worksites platform
       - name: Start full stack
         working-directory: deploy/stack
-        env:
-          CW_API_HOST: http://localhost
         run: |
           if ! docker compose up -d; then
             docker compose ps -a
@@ -44,8 +39,6 @@ jobs:
           fi
       - name: Verify stack
         working-directory: deploy/stack
-        env:
-          CW_API_HOST: http://localhost
         run: |
           trap 'docker compose logs --no-color --tail=200' ERR
           for i in $(seq 1 30); do
@@ -56,6 +49,4 @@ jobs:
       - name: Tear down
         if: always()
         working-directory: deploy/stack
-        env:
-          CW_API_HOST: http://localhost
         run: docker compose down -v --remove-orphans
