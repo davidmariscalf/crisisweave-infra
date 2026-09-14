@@ -40,6 +40,11 @@ jobs:
           test -f deploy/secrets/README.md
           test -f deploy/dr/README.md
           test -f deploy/dr/litestream.yml.example
+          test -f deploy/edge/README.md
+          test -f deploy/edge/Caddyfile.example
+          test -f deploy/observability/README.md
+          test -f deploy/observability/blackbox.yml.example
+          test -f deploy/observability/prometheus.yml.example
 
       - name: Validate public health document
         run: python -c 'import json; d=json.load(open("site/health.json")); assert d["status"]=="ok" and d["synthetic_demo_only"] is True'
@@ -55,9 +60,12 @@ jobs:
           expected={
             'goauthentik/authentik':('2026.8.2','recommended_not_deployed'),
             'oauth2-proxy/oauth2-proxy':('7.15.4','recommended_not_deployed'),
+            'caddyserver/caddy':('2.11.4','recommended_not_deployed'),
             'openbao/openbao':('2.6.2','recommended_not_deployed'),
             'benbjohnson/litestream':('0.5.17','recommended_not_deployed'),
             'restic/restic':('0.19.1','recommended_not_deployed'),
+            'prometheus/prometheus':('3.14.0','recommended_not_deployed'),
+            'prometheus/blackbox_exporter':('0.28.0','recommended_not_deployed'),
             'rqlite/rqlite':('10.3.3','evaluated_not_adopted'),
             'CrisisCleanup/crisiscleanup-4-web':('master','adapter_only_no_live_credentials'),
           }
@@ -77,6 +85,12 @@ jobs:
           dr=Path('deploy/dr/litestream.yml.example').read_text()
           for marker in ('<PLATFORM_REPLICA_URL>','<PRIVATE_REPLICA_URL>','<WORKSITES_REPLICA_URL>'):
               assert marker in dr
+          caddy=Path('deploy/edge/Caddyfile.example').read_text()
+          assert 'reverse_proxy crisisweave-platform:8080' in caddy
+          assert 'api.example.org' in caddy
+          prom=Path('deploy/observability/prometheus.yml.example').read_text()
+          assert 'crisisweave-platform:8080' in prom
+          assert 'blackbox-exporter:9115' in prom
           PY
 
       - name: Verify no credential material in public site
