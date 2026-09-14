@@ -33,9 +33,51 @@ jobs:
           test -f site/coordinator-demo.js
           test -f netlify.toml
           test -f .env.example
+          test -f ecosystem/components.lock.json
+          test -f ecosystem/README.md
+          test -f deploy/identity/README.md
+          test -f deploy/identity/oauth2-proxy.env.example
+          test -f deploy/secrets/README.md
+          test -f deploy/dr/README.md
+          test -f deploy/dr/litestream.yml.example
 
       - name: Validate public health document
         run: python -c 'import json; d=json.load(open("site/health.json")); assert d["status"]=="ok" and d["synthetic_demo_only"] is True'
+
+      - name: Validate external component lock
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('ecosystem/components.lock.json').read_text())
+          assert d['schema_version']==1
+          rows={x['repository']:x for x in d['components']}
+          expected={
+            'goauthentik/authentik':('2026.8.2','recommended_not_deployed'),
+            'oauth2-proxy/oauth2-proxy':('7.15.4','recommended_not_deployed'),
+            'openbao/openbao':('2.6.2','recommended_not_deployed'),
+            'benbjohnson/litestream':('0.5.17','recommended_not_deployed'),
+            'restic/restic':('0.19.1','recommended_not_deployed'),
+            'rqlite/rqlite':('10.3.3','evaluated_not_adopted'),
+            'CrisisCleanup/crisiscleanup-4-web':('master','adapter_only_no_live_credentials'),
+          }
+          assert set(rows)==set(expected)
+          for repo,(version,status) in expected.items():
+              assert rows[repo]['version']==version
+              assert rows[repo]['status']==status
+          PY
+
+      - name: Validate secret-free deployment templates
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          identity=Path('deploy/identity/oauth2-proxy.env.example').read_text()
+          assert 'OAUTH2_PROXY_CLIENT_SECRET=\n' in identity
+          assert 'OAUTH2_PROXY_COOKIE_SECRET=\n' in identity
+          dr=Path('deploy/dr/litestream.yml.example').read_text()
+          for marker in ('<PLATFORM_REPLICA_URL>','<PRIVATE_REPLICA_URL>','<WORKSITES_REPLICA_URL>'):
+              assert marker in dr
+          PY
 
       - name: Verify no credential material in public site
         run: |
