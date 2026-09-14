@@ -17,14 +17,29 @@ if [ -z "$platform_id" ] || [ -z "$worksites_id" ]; then
   exit 1
 fi
 
+platform_tmp="/data/.cw-backup-platform-$stamp.sqlite3"
+private_tmp="/data/.cw-backup-private-$stamp.sqlite3"
+worksites_tmp="/data/.cw-backup-worksites-$stamp.sqlite3"
+
+cleanup() {
+  docker compose exec -T platform rm -f "$platform_tmp" "$private_tmp" >/dev/null 2>&1 || true
+  docker compose exec -T worksites rm -f "$worksites_tmp" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
 # SQLite's online backup API produces transactionally valid snapshots while the
 # services stay available. Each database is backed up independently; this is a
 # disaster-recovery snapshot, not a cross-service distributed transaction.
-docker compose exec -T platform python - <<'PY'
+docker compose exec -T \
+  -e CW_BACKUP_PLATFORM="$platform_tmp" \
+  -e CW_BACKUP_PRIVATE="$private_tmp" \
+  platform python - <<'PY'
+import os
 import sqlite3
+
 for src_path, dst_path in (
-    ("/data/platform.db", "/tmp/cw-platform.sqlite3"),
-    ("/data/private.db", "/tmp/cw-private.sqlite3"),
+    ("/data/platform.db", os.environ["CW_BACKUP_PLATFORM"]),
+    ("/data/private.db", os.environ["CW_BACKUP_PRIVATE"]),
 ):
     src = sqlite3.connect(src_path, timeout=10)
     dst = sqlite3.connect(dst_path)
@@ -38,10 +53,14 @@ for src_path, dst_path in (
         src.close()
 PY
 
-docker compose exec -T worksites python - <<'PY'
+docker compose exec -T \
+  -e CW_BACKUP_WORKSITES="$worksites_tmp" \
+  worksites python - <<'PY'
+import os
 import sqlite3
+
 src = sqlite3.connect("/data/worksites.db", timeout=10)
-dst = sqlite3.connect("/tmp/cw-worksites.sqlite3")
+dst = sqlite3.connect(os.environ["CW_BACKUP_WORKSITES"])
 try:
     src.backup(dst)
     result = dst.execute("PRAGMA integrity_check").fetchone()[0]
@@ -52,12 +71,12 @@ finally:
     src.close()
 PY
 
-docker cp "$platform_id:/tmp/cw-platform.sqlite3" "$out/platform.sqlite3" >/dev/null
-docker cp "$platform_id:/tmp/cw-private.sqlite3" "$out/private.sqlite3" >/dev/null
-docker cp "$worksites_id:/tmp/cw-worksites.sqlite3" "$out/worksites.sqlite3" >/dev/null
+docker cp "$platform_id:$platform_tmp" "$out/platform.sqlite3" >/dev/null
+docker cp "$platform_id:$private_tmp" "$out/private.sqlite3" >/dev/null
+docker cp "$worksites_id:$worksites_tmp" "$out/worksites.sqlite3" >/dev/null
 
-docker compose exec -T platform rm -f /tmp/cw-platform.sqlite3 /tmp/cw-private.sqlite3
-docker compose exec -T worksites rm -f /tmp/cw-worksites.sqlite3
+cleanup
+trap - EXIT INT TERM
 
 (
   cd "$out"
@@ -69,7 +88,7 @@ cat > "$out/METADATA" <<EOF
 created_at=$stamp
 format=crisisweave-stack-backup-v1
 platform_commit=74ce5b52a1c9eedefdff992f7080b6532415213b
-worksites_commit=7aababcccfb26ffe4e949835e7b4bf1183cee93a
+worksites_commit=b3ef51e9537fe7b7d24ddef649d431923ceaab62
 EOF
 chmod 600 "$out/METADATA"
 
