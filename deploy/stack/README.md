@@ -34,19 +34,24 @@ Edit `.env` and set:
 CW_API_HOST=api.example.org
 ```
 
-Then deploy:
+Then deploy and verify:
 
 ```bash
 docker compose up -d --build
-```
-
-Verify:
-
-```bash
 sh verify.sh
 ```
 
 The initializer generates two random 256-bit values inside the ignored, mode-0600 local `.env` file and never prints them. Do not send that file through chat, email, issues, logs or Git. Docker administrators can inspect container environment variables and should therefore be treated as privileged host administrators; move runtime secrets to OpenBao or an equivalent secret manager for a real production deployment.
+
+## First administrator
+
+The stack intentionally ships with no universal/default account or token. After the host is under operator control, bootstrap the first organisation and administrator explicitly:
+
+```bash
+sh bootstrap-admin.sh relief-org "Relief Organisation" admin-1 "Initial Administrator"
+```
+
+The helper creates the organisation and admin through the platform CLI and issues an 8-hour bearer token. That token is shown once in the server terminal; store it in an appropriate secret/password manager and do not put it in source control or chat.
 
 ## Updates
 
