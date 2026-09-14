@@ -64,6 +64,7 @@ PY
 
 printf '%s\n' 'Checking audit immutability guards...'
 docker compose exec -T platform python audit_guard.py verify >/dev/null
+docker compose exec -T worksites python audit_guard.py verify >/dev/null
 
 printf '%s\n' 'Checking internal Caddy readiness and metrics isolation...'
 docker compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8081/healthz
