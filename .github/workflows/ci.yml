@@ -8,8 +8,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
@@ -45,6 +45,10 @@ jobs:
           test -f deploy/observability/README.md
           test -f deploy/observability/blackbox.yml.example
           test -f deploy/observability/prometheus.yml.example
+          test -f deploy/stack/compose.yaml
+          test -f deploy/stack/alerts.yml
+          test -f deploy/stack/backup.sh
+          test -f deploy/stack/restore-drill.sh
 
       - name: Validate public health document
         run: python -c 'import json; d=json.load(open("site/health.json")); assert d["status"]=="ok" and d["synthetic_demo_only"] is True'
@@ -91,6 +95,38 @@ jobs:
           prom=Path('deploy/observability/prometheus.yml.example').read_text()
           assert 'crisisweave-platform:8080' in prom
           assert 'blackbox-exporter:9115' in prom
+          PY
+
+      - name: Validate stack hardening invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          compose=Path('deploy/stack/compose.yaml').read_text()
+          for required in (
+              'CW_TRUST_PROXY: "1"',
+              'pids_limit:',
+              'mem_limit:',
+              'max-size: "10m"',
+              './alerts.yml:/etc/prometheus/alerts.yml:ro',
+              'internal: true',
+          ):
+              assert required in compose, required
+          assert 'worksites:' in compose and 'platform:' in compose
+          alerts=Path('deploy/stack/alerts.yml').read_text()
+          for alert in (
+              'CrisisWeavePlatformDatabaseUnhealthy',
+              'CrisisWeaveWorksitesUnavailable',
+              'CrisisWeaveDataVolumeLow',
+              'CrisisWeaveServerErrorsHigh',
+              'CrisisWeaveEdgeReadinessDown',
+          ):
+              assert alert in alerts, alert
+          backup=Path('deploy/stack/backup.sh').read_text()
+          assert 'PRAGMA integrity_check' in backup
+          assert 'sha256sum' in backup
+          drill=Path('deploy/stack/restore-drill.sh').read_text()
+          assert 'mode=ro' in drill
+          assert 'live data was not modified' in drill
           PY
 
       - name: Verify no credential material in public site
