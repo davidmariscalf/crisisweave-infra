@@ -7,18 +7,41 @@ log() {
   printf '[crisisweave-bootstrap] %s\n' "$*"
 }
 
-log 'Installing Docker and required tools'
+log 'Installing Docker and required security tools'
 apt-get update
-apt-get install -y ca-certificates curl git openssl docker.io docker-compose-v2
+apt-get install -y ca-certificates curl git openssl docker.io docker-compose-v2 ufw unattended-upgrades
 systemctl enable --now docker
+
+log 'Configuring automatic security updates without automatic reboots'
+cat >/etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+cat >/etc/apt/apt.conf.d/52crisisweave-unattended-upgrades <<'EOF'
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+EOF
+systemctl enable --now apt-daily.timer apt-daily-upgrade.timer || true
+
+log 'Configuring host firewall'
+ufw --force reset
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 443/udp
+if [ "${ssh_enabled}" = "true" ]; then
+  ufw allow from "${ssh_source_cidr}" to any port 22 proto tcp
+fi
+ufw --force enable
 
 install -d -m 0755 /opt/crisisweave
 if [ ! -d /opt/crisisweave/infra/.git ]; then
-  git clone --depth 1 --branch "${infra_git_ref}" https://github.com/davidmariscalf/crisisweave-infra.git /opt/crisisweave/infra
-else
-  git -C /opt/crisisweave/infra fetch --depth 1 origin "${infra_git_ref}"
-  git -C /opt/crisisweave/infra reset --hard FETCH_HEAD
+  git clone --no-checkout https://github.com/davidmariscalf/crisisweave-infra.git /opt/crisisweave/infra
 fi
+
+git -C /opt/crisisweave/infra fetch --depth 1 origin "${infra_git_ref}"
+git -C /opt/crisisweave/infra checkout --detach FETCH_HEAD
 
 cd /opt/crisisweave/infra/deploy/stack
 
@@ -39,7 +62,7 @@ set_env_value CW_API_HOST "${api_site}"
 set_env_value CW_ALLOWED_ORIGIN "${allowed_origin}"
 chmod 600 .env
 
-log 'Building and starting CrisisWeave'
+log 'Building and starting CrisisWeave from the pinned infrastructure revision'
 docker compose up -d --build
 
 cat >/etc/systemd/system/crisisweave-compose.service <<'EOF'
