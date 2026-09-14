@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "generated_for": "CrisisWeave",
+  "policy": "External projects are integrated through documented interfaces and deployment configuration. No upstream source code or production credentials are vendored here.",
+  "components": [
+    {
+      "name": "authentik",
+      "repository": "goauthentik/authentik",
+      "version": "2026.8.2",
+      "release_tag": "version/2026.8.2",
+      "role": "identity_provider_mfa_oidc",
+      "status": "recommended_not_deployed"
+    },
+    {
+      "name": "oauth2-proxy",
+      "repository": "oauth2-proxy/oauth2-proxy",
+      "version": "7.15.4",
+      "release_tag": "v7.15.4",
+      "role": "oidc_reverse_auth_boundary",
+      "status": "recommended_not_deployed"
+    },
+    {
+      "name": "OpenBao",
+      "repository": "openbao/openbao",
+      "version": "2.6.2",
+      "release_tag": "v2.6.2",
+      "role": "secret_and_key_management",
+      "status": "recommended_not_deployed"
+    },
+    {
+      "name": "Litestream",
+      "repository": "benbjohnson/litestream",
+      "version": "0.5.17",
+      "release_tag": "v0.5.17",
+      "role": "continuous_sqlite_disaster_recovery",
+      "status": "recommended_not_deployed"
+    },
+    {
+      "name": "restic",
+      "repository": "restic/restic",
+      "version": "0.19.1",
+      "release_tag": "v0.19.1",
+      "role": "encrypted_backup_and_restore",
+      "status": "recommended_not_deployed"
+    },
+    {
+      "name": "rqlite",
+      "repository": "rqlite/rqlite",
+      "version": "10.3.3",
+      "release_tag": "v10.3.3",
+      "role": "future_multi_node_transactional_store_candidate",
+      "status": "evaluated_not_adopted"
+    },
+    {
+      "name": "Crisis Cleanup web",
+      "repository": "CrisisCleanup/crisiscleanup-4-web",
+      "version": "master",
+      "release_tag": null,
+      "role": "partner_contract_reference_only",
+      "status": "adapter_only_no_live_credentials"
+    }
+  ]
+}
