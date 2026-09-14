@@ -5,16 +5,10 @@ services:
     build:
       context: ${CW_WORKSITES_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-worksites.git#0bc11a3504f1829cc9aefde8f8b56525674c428a}
     restart: unless-stopped
-    command:
-      - /bin/sh
-      - -ec
-      - |
-        export CW_COORDINATOR_TOKEN="$$(cat /run/secrets/cw_worksites_token)"
-        exec python worksites.py --db /data/worksites.db serve --host 0.0.0.0 --port 8787
+    environment:
+      CW_COORDINATOR_TOKEN: ${CW_WORKSITES_TOKEN:?CW_WORKSITES_TOKEN must be set in the local .env file}
     volumes:
       - worksites_data:/data
-    secrets:
-      - cw_worksites_token
     networks:
       - app_internal
     expose:
@@ -40,14 +34,9 @@ services:
     depends_on:
       worksites:
         condition: service_healthy
-    command:
-      - /bin/sh
-      - -ec
-      - |
-        export CW_TOKEN_PEPPER="$$(cat /run/secrets/cw_token_pepper)"
-        export CW_WORKSITES_TOKEN="$$(cat /run/secrets/cw_worksites_token)"
-        exec python prometheus_server.py
     environment:
+      CW_TOKEN_PEPPER: ${CW_TOKEN_PEPPER:?CW_TOKEN_PEPPER must be set in the local .env file}
+      CW_WORKSITES_TOKEN: ${CW_WORKSITES_TOKEN:?CW_WORKSITES_TOKEN must be set in the local .env file}
       CW_DB: /data/platform.db
       CW_PRIVATE_DB: /data/private.db
       CW_WORKSITES_URL: http://worksites:8787
@@ -57,9 +46,6 @@ services:
       CW_ALLOWED_ORIGIN: ${CW_ALLOWED_ORIGIN:-https://crisisweave.netlify.app}
     volumes:
       - platform_data:/data
-    secrets:
-      - cw_token_pepper
-      - cw_worksites_token
     networks:
       - app_internal
       - monitoring_internal
@@ -154,12 +140,6 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-
-secrets:
-  cw_token_pepper:
-    file: ./secrets/cw_token_pepper
-  cw_worksites_token:
-    file: ./secrets/cw_worksites_token
 
 volumes:
   worksites_data:
