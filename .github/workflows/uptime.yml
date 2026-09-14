@@ -2,6 +2,10 @@ name: public-uptime
 on:
   push:
     branches: [main]
+    paths:
+      - 'site/**'
+      - 'netlify.toml'
+      - '.github/workflows/uptime.yml'
   workflow_dispatch:
   schedule:
     - cron: '17 */6 * * *'
