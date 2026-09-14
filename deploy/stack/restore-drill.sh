@@ -7,7 +7,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 backup="$1"
-for file in platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEAL.json SHA256SUMS METADATA; do
+for file in platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEALS.json SHA256SUMS METADATA; do
   if [ ! -f "$backup/$file" ]; then
     echo "missing backup file: $file" >&2
     exit 1
@@ -38,43 +38,63 @@ for name in ("platform.sqlite3", "private.sqlite3", "worksites.sqlite3"):
         con.close()
     print(f"{name}: ok")
 
-platform = root / "platform.sqlite3"
-con = sqlite3.connect(f"file:{platform}?mode=ro", uri=True)
-con.row_factory = sqlite3.Row
-try:
-    triggers = {
-        r[0]
-        for r in con.execute(
-            "SELECT name FROM sqlite_master WHERE type='trigger' AND name IN ('audit_no_update','audit_no_delete')"
-        )
-    }
-    if triggers != {"audit_no_update", "audit_no_delete"}:
-        raise SystemExit("platform backup is missing audit immutability triggers")
-    rows = con.execute(
-        "SELECT seq,at,organisation_id,principal_id,action,target,outcome,details FROM audit ORDER BY seq"
-    ).fetchall()
-finally:
-    con.close()
 
-head = bytes(32)
-for row in rows:
-    item = dict(row)
+def verify_triggers(path: pathlib.Path, label: str) -> None:
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
-        item["details"] = json.loads(item["details"])
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"audit row {item['seq']} contains invalid details JSON") from exc
-    encoded = json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    head = hashlib.sha256(head + b"\n" + encoded).digest()
+        triggers = {
+            r[0]
+            for r in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger' AND name IN ('audit_no_update','audit_no_delete')"
+            )
+        }
+    finally:
+        con.close()
+    if triggers != {"audit_no_update", "audit_no_delete"}:
+        raise SystemExit(f"{label} backup is missing audit immutability triggers")
 
-seal = json.loads((root / "AUDIT_SEAL.json").read_text(encoding="utf-8"))
+
+def chain(path: pathlib.Path, query: str) -> dict:
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+    try:
+        rows = con.execute(query).fetchall()
+    finally:
+        con.close()
+    head = bytes(32)
+    for row in rows:
+        item = dict(row)
+        if "details" in item:
+            try:
+                item["details"] = json.loads(item["details"])
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"audit row {item.get('seq')} contains invalid details JSON") from exc
+        encoded = json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        head = hashlib.sha256(head + b"\n" + encoded).digest()
+    return {"rows": len(rows), "head_sha256": head.hex()}
+
+platform = root / "platform.sqlite3"
+worksites = root / "worksites.sqlite3"
+verify_triggers(platform, "platform")
+verify_triggers(worksites, "worksites")
 expected = {
-    "format": "crisisweave-audit-chain-v1",
-    "rows": len(rows),
-    "head_sha256": head.hex(),
+    "format": "crisisweave-audit-chains-v1",
+    "platform": chain(
+        platform,
+        "SELECT seq,at,organisation_id,principal_id,action,target,outcome,details FROM audit ORDER BY seq",
+    ),
+    "worksites": chain(
+        worksites,
+        "SELECT seq,worksite_id,at,actor,action,from_state,to_state,note,details FROM audit ORDER BY seq",
+    ),
 }
-if seal != expected:
+actual = json.loads((root / "AUDIT_SEALS.json").read_text(encoding="utf-8"))
+if actual != expected:
     raise SystemExit("audit seal mismatch")
-print(f"audit seal: ok ({len(rows)} rows)")
+print(
+    "audit seals: ok "
+    f"(platform={expected['platform']['rows']} rows, worksites={expected['worksites']['rows']} rows)"
+)
 PY
 
 # This script intentionally never writes into live Docker volumes. A real
