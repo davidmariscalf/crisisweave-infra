@@ -17,5 +17,16 @@ jobs:
       - name: Validate required files
         run: |
           test -f site/index.html
+          test -f site/_headers
+          test -f site/_redirects
+          test -f site/health.json
+          test -f site/robots.txt
+          test -f site/sitemap.xml
+          test -f site/.well-known/security.txt
           test -f netlify.toml
           test -f .env.example
+      - name: Validate public health document
+        run: python -c 'import json; d=json.load(open("site/health.json")); assert d["status"]=="ok" and d["synthetic_demo_only"] is True'
+      - name: Verify no secret placeholders leaked into public site
+        run: |
+          ! grep -RniE 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}|sk[-_][A-Za-z0-9_-]{20,}' site
