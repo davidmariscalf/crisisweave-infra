@@ -1,0 +1,12 @@
+# Example only. Render the replica URL outside Git from a secret manager.
+# The placeholder must never be replaced with a real credential in this repository.
+dbs:
+  - path: /data/platform.db
+    replica:
+      url: <PLATFORM_REPLICA_URL>
+  - path: /data/private.db
+    replica:
+      url: <PRIVATE_REPLICA_URL>
+  - path: /data/worksites.db
+    replica:
+      url: <WORKSITES_REPLICA_URL>
