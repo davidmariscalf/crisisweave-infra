@@ -8,7 +8,9 @@ data "oci_core_images" "ubuntu" {
 }
 
 locals {
-  api_site = trimspace(var.api_hostname) == "" ? ":80" : var.api_hostname
+  api_site            = trimspace(var.api_hostname) == "" ? ":80" : trimspace(var.api_hostname)
+  ssh_enabled         = trimspace(var.ssh_public_key) != ""
+  verified_infra_ref  = "4f7e8796568b652f88e856a337352c36abfbae75"
 }
 
 resource "oci_core_instance" "crisisweave" {
@@ -38,14 +40,16 @@ resource "oci_core_instance" "crisisweave" {
   metadata = merge(
     {
       user_data = base64encode(templatefile("${path.module}/cloud-init.sh.tftpl", {
-        api_site       = local.api_site
-        allowed_origin = "https://crisisweave.netlify.app"
-        infra_git_ref  = "main"
+        api_site        = local.api_site
+        allowed_origin  = "https://crisisweave.netlify.app"
+        infra_git_ref   = local.verified_infra_ref
+        ssh_enabled     = local.ssh_enabled ? "true" : "false"
+        ssh_source_cidr = var.ssh_source_cidr
       }))
     },
-    trimspace(var.ssh_public_key) == "" ? {} : {
+    local.ssh_enabled ? {
       ssh_authorized_keys = trimspace(var.ssh_public_key)
-    }
+    } : {}
   )
 
   freeform_tags = {
