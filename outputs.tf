@@ -20,14 +20,13 @@ output "health_url" {
 
 output "next_steps" {
   description = "Post-deploy instructions."
-  value = trimspace(var.api_hostname) == "" ? <<-EOT
-    CrisisWeave is bootstrapping on the VM. Wait about 5-10 minutes, then open the health_url output.
-    This HTTP bootstrap endpoint is for synthetic/testing use only. Point a DNS hostname at public_ip, set CW_API_HOST on the VM, and restart the stack before any real sensitive data.
-    Use OCI Cloud Shell or an SSH key to run deploy/stack/bootstrap-admin.sh when you are ready to create the first operator.
-  EOT
-  : <<-EOT
-    CrisisWeave is bootstrapping on the VM. Wait about 5-10 minutes, then open the health_url output.
-    Caddy will request HTTPS automatically once the hostname resolves to public_ip.
-    Use OCI Cloud Shell or an SSH key to run deploy/stack/bootstrap-admin.sh when you are ready to create the first operator.
-  EOT
+  value = trimspace(var.api_hostname) == "" ? join("\n", [
+    "CrisisWeave is bootstrapping on the VM. Wait about 5-10 minutes, then open the health_url output.",
+    "This HTTP bootstrap endpoint is for synthetic/testing use only. Point a DNS hostname at public_ip, set CW_API_HOST on the VM, and restart the stack before any real sensitive data.",
+    "Use OCI Cloud Shell or an SSH key to run deploy/stack/bootstrap-admin.sh when you are ready to create the first operator."
+    ]) : join("\n", [
+    "CrisisWeave is bootstrapping on the VM. Wait about 5-10 minutes, then open the health_url output.",
+    "Caddy will request HTTPS automatically once the hostname resolves to public_ip.",
+    "Use OCI Cloud Shell or an SSH key to run deploy/stack/bootstrap-admin.sh when you are ready to create the first operator."
+  ])
 }
