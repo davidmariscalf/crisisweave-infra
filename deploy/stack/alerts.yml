@@ -1,0 +1,47 @@
+groups:
+  - name: crisisweave-runtime
+    rules:
+      - alert: CrisisWeavePlatformDatabaseUnhealthy
+        expr: min(crisisweave_platform_database_healthy) < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: CrisisWeave SQLite health check is failing
+          description: At least one platform database has failed its internal health check for more than one minute.
+
+      - alert: CrisisWeaveWorksitesUnavailable
+        expr: crisisweave_platform_worksites_up < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: CrisisWeave worksite service is unavailable
+          description: The authenticated platform cannot reach the internal worksite service.
+
+      - alert: CrisisWeaveDataVolumeLow
+        expr: crisisweave_platform_data_volume_free_ratio < 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: CrisisWeave data volume has less than 10 percent free space
+          description: Free storage has remained below 10 percent for five minutes. Backups and SQLite writes may soon fail.
+
+      - alert: CrisisWeaveServerErrorsHigh
+        expr: increase(crisisweave_platform_server_errors_total[5m]) >= 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: CrisisWeave platform is returning repeated 5xx responses
+          description: At least five server errors were observed in the last five minutes.
+
+      - alert: CrisisWeaveEdgeReadinessDown
+        expr: probe_success{job="crisisweave-edge-readiness"} < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: CrisisWeave edge readiness probe is failing
+          description: The internal blackbox probe cannot reach the Caddy readiness route.
