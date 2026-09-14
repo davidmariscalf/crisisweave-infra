@@ -7,7 +7,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 backup="$1"
-for file in platform.sqlite3 private.sqlite3 worksites.sqlite3 SHA256SUMS METADATA; do
+for file in platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEAL.json SHA256SUMS METADATA; do
   if [ ! -f "$backup/$file" ]; then
     echo "missing backup file: $file" >&2
     exit 1
@@ -20,6 +20,8 @@ done
 )
 
 python3 - "$backup" <<'PY'
+import hashlib
+import json
 import pathlib
 import sqlite3
 import sys
@@ -35,6 +37,44 @@ for name in ("platform.sqlite3", "private.sqlite3", "worksites.sqlite3"):
     finally:
         con.close()
     print(f"{name}: ok")
+
+platform = root / "platform.sqlite3"
+con = sqlite3.connect(f"file:{platform}?mode=ro", uri=True)
+con.row_factory = sqlite3.Row
+try:
+    triggers = {
+        r[0]
+        for r in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='trigger' AND name IN ('audit_no_update','audit_no_delete')"
+        )
+    }
+    if triggers != {"audit_no_update", "audit_no_delete"}:
+        raise SystemExit("platform backup is missing audit immutability triggers")
+    rows = con.execute(
+        "SELECT seq,at,organisation_id,principal_id,action,target,outcome,details FROM audit ORDER BY seq"
+    ).fetchall()
+finally:
+    con.close()
+
+head = bytes(32)
+for row in rows:
+    item = dict(row)
+    try:
+        item["details"] = json.loads(item["details"])
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"audit row {item['seq']} contains invalid details JSON") from exc
+    encoded = json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    head = hashlib.sha256(head + b"\n" + encoded).digest()
+
+seal = json.loads((root / "AUDIT_SEAL.json").read_text(encoding="utf-8"))
+expected = {
+    "format": "crisisweave-audit-chain-v1",
+    "rows": len(rows),
+    "head_sha256": head.hex(),
+}
+if seal != expected:
+    raise SystemExit("audit seal mismatch")
+print(f"audit seal: ok ({len(rows)} rows)")
 PY
 
 # This script intentionally never writes into live Docker volumes. A real
