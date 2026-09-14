@@ -12,21 +12,55 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Reject committed secrets
         run: python scripts/check-secrets.py
+
       - name: Validate required files
         run: |
           test -f site/index.html
+          test -f site/404.html
           test -f site/_headers
           test -f site/_redirects
           test -f site/health.json
           test -f site/robots.txt
           test -f site/sitemap.xml
+          test -f site/security.txt
           test -f site/.well-known/security.txt
+          test -f site/volunteer-demo.html
+          test -f site/volunteer-demo.js
+          test -f site/coordinator-demo.html
+          test -f site/coordinator-demo.js
           test -f netlify.toml
           test -f .env.example
+
       - name: Validate public health document
         run: python -c 'import json; d=json.load(open("site/health.json")); assert d["status"]=="ok" and d["synthetic_demo_only"] is True'
-      - name: Verify no secret placeholders leaked into public site
+
+      - name: Verify no credential material in public site
         run: |
           ! grep -RniE 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}|sk[-_][A-Za-z0-9_-]{20,}' site
+
+      - name: Validate public demo safety invariants
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          for name in ('volunteer-demo.html','coordinator-demo.html'):
+              text=(Path('site')/name).read_text(encoding='utf-8')
+              assert 'synthetic' in text.lower(), name
+              assert not re.search(r'<script(?![^>]*\bsrc=)[^>]*>', text, re.I), f'inline script in {name}'
+              lower=text.lower()
+              for forbidden in ('survivor_name','phone_number','exact_address','government_id','social security'):
+                  assert forbidden not in lower, f'{forbidden} in {name}'
+          volunteer=(Path('site')/'volunteer-demo.html').read_text(encoding='utf-8').lower()
+          coordinator=(Path('site')/'coordinator-demo.html').read_text(encoding='utf-8').lower()
+          assert 'not permission to enter' in volunteer
+          assert 'incident intelligence shown here does not create a volunteer cleanup job' in coordinator
+          assert 'claim' not in volunteer
+          redirects=(Path('site')/'_redirects').read_text(encoding='utf-8')
+          assert '/.well-known/security.txt /security.txt 200' in redirects
+          headers=(Path('site')/'_headers').read_text(encoding='utf-8').lower()
+          assert 'content-security-policy:' in headers
+          assert "default-src 'self'" in headers
+          PY
