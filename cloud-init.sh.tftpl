@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+log() {
+  printf '[crisisweave-bootstrap] %s\n' "$*"
+}
+
+log 'Installing Docker and required tools'
+apt-get update
+apt-get install -y ca-certificates curl git openssl docker.io docker-compose-v2
+systemctl enable --now docker
+
+install -d -m 0755 /opt/crisisweave
+if [ ! -d /opt/crisisweave/infra/.git ]; then
+  git clone --depth 1 --branch "${infra_git_ref}" https://github.com/davidmariscalf/crisisweave-infra.git /opt/crisisweave/infra
+else
+  git -C /opt/crisisweave/infra fetch --depth 1 origin "${infra_git_ref}"
+  git -C /opt/crisisweave/infra reset --hard FETCH_HEAD
+fi
+
+cd /opt/crisisweave/infra/deploy/stack
+
+if [ ! -f .env ]; then
+  cp .env.example .env
+  token_pepper="$(openssl rand -hex 32)"
+  worksites_token="$(openssl rand -hex 32)"
+  cat >> .env <<EOF
+CW_API_HOST=${api_site}
+CW_ALLOWED_ORIGIN=${allowed_origin}
+CW_TOKEN_PEPPER=$token_pepper
+CW_WORKSITES_TOKEN=$worksites_token
+EOF
+  chmod 600 .env
+  unset token_pepper worksites_token
+fi
+
+log 'Building and starting CrisisWeave'
+docker compose up -d --build
+
+cat >/etc/systemd/system/crisisweave-compose.service <<'EOF'
+[Unit]
+Description=CrisisWeave Docker Compose stack
+Requires=docker.service network-online.target
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/crisisweave/infra/deploy/stack
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable crisisweave-compose.service
+
+log 'Waiting for the stack to become ready'
+for attempt in $(seq 1 60); do
+  if sh verify.sh >/var/log/crisisweave-verify.log 2>&1; then
+    touch /opt/crisisweave/READY
+    log 'CrisisWeave is ready'
+    exit 0
+  fi
+  sleep 5
+done
+
+log 'CrisisWeave did not become ready before bootstrap timeout'
+docker compose ps || true
+docker compose logs --no-color --tail=200 platform worksites caddy prometheus blackbox || true
+exit 1

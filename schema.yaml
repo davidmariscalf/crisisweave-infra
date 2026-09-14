@@ -1,0 +1,89 @@
+title: "CrisisWeave OCI Always Free"
+description: "Deploy the CrisisWeave backend to an OCI Always Free Ampere A1 VM from the browser."
+schemaVersion: 1.1.0
+version: "20260914"
+locale: "en"
+
+variableGroups:
+  - title: "Oracle configuration"
+    variables:
+      - compartment_ocid
+      - availability_domain_name
+  - title: "Access and hostname"
+    variables:
+      - ssh_public_key
+      - api_hostname
+  - title: "Always Free sizing"
+    variables:
+      - ocpus
+      - memory_gbs
+      - boot_volume_gbs
+  - title: "Resource Manager supplied values"
+    visible: false
+    variables:
+      - tenancy_ocid
+      - region
+
+variables:
+  tenancy_ocid:
+    type: string
+    visible: false
+    required: true
+
+  region:
+    type: oci:identity:region:name
+    visible: false
+    required: true
+
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Compartment"
+    description: "Compartment where CrisisWeave will be created."
+    required: true
+
+  availability_domain_name:
+    type: oci:identity:availabilitydomain:name
+    title: "Availability domain"
+    description: "Choose another domain if Oracle reports out of host capacity."
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  ssh_public_key:
+    type: string
+    title: "SSH public key (optional)"
+    description: "Optional emergency SSH access. Leave blank to manage from OCI Console/Cloud Shell."
+    required: false
+
+  api_hostname:
+    type: string
+    title: "API hostname (optional)"
+    description: "If blank, the VM starts in HTTP bootstrap mode. Configure DNS and HTTPS before real sensitive data."
+    required: false
+
+  ocpus:
+    type: number
+    title: "OCPUs"
+    description: "2026 Always Free maximum for an A1 tenancy allocation."
+    default: 2
+    minimum: 1
+    maximum: 2
+    required: true
+
+  memory_gbs:
+    type: number
+    title: "Memory (GB)"
+    description: "2026 Always Free maximum for an A1 tenancy allocation."
+    default: 12
+    minimum: 1
+    maximum: 12
+    required: true
+
+  boot_volume_gbs:
+    type: number
+    title: "Boot volume (GB)"
+    description: "Default 50 GB; Always Free storage limits are tenancy-wide."
+    default: 50
+    minimum: 47
+    maximum: 100
+    required: true
