@@ -14,6 +14,11 @@ api.example.org {
         max_size 128KB
     }
 
+    # Prometheus scrapes the platform over the private application network.
+    # Do not expose aggregate operational metrics through the public edge.
+    @metrics path /metrics
+    respond @metrics 404
+
     reverse_proxy crisisweave-platform:8080 {
         health_uri /healthz
         health_interval 30s
