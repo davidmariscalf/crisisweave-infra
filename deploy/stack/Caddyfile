@@ -1,0 +1,31 @@
+{$CW_API_HOST} {
+    encode zstd gzip
+
+    @metrics path /metrics
+    respond @metrics 404
+
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    request_body {
+        max_size 128KB
+    }
+
+    reverse_proxy platform:8080 {
+        health_uri /healthz
+        health_interval 30s
+        health_timeout 3s
+    }
+}
+
+:8081 {
+    @health path /healthz /readyz
+    reverse_proxy @health platform:8080
+    respond 404
+}
