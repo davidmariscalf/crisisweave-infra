@@ -10,7 +10,7 @@ data "oci_core_images" "ubuntu" {
 locals {
   api_site           = trimspace(var.api_hostname) == "" ? ":80" : trimspace(var.api_hostname)
   ssh_enabled        = trimspace(var.ssh_public_key) != ""
-  verified_infra_ref = "d30dba1d531af8f592670a4ed04b5799f52a35a7"
+  verified_infra_ref = "ebf42cc9acc872c64eab2584aaff0bd38e45e3ef"
 }
 
 resource "oci_core_instance" "crisisweave" {
