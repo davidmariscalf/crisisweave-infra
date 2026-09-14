@@ -1,12 +1,21 @@
 name: crisisweave
 
+x-json-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   worksites:
     build:
-      context: ${CW_WORKSITES_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-worksites.git#c91affa98d0a26547abeca10844e7adbad80ef18}
+      context: ${CW_WORKSITES_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-worksites.git#7aababcccfb26ffe4e949835e7b4bf1183cee93a}
     restart: unless-stopped
+    init: true
     environment:
       CW_COORDINATOR_TOKEN: ${CW_WORKSITES_TOKEN:?CW_WORKSITES_TOKEN must be set in the local .env file}
+      CW_MAX_HTTP_WORKERS: ${CW_WORKSITES_HTTP_WORKERS:-32}
+      CW_HTTP_SOCKET_TIMEOUT: ${CW_HTTP_SOCKET_TIMEOUT:-10}
     volumes:
       - worksites_data:/data
     networks:
@@ -26,11 +35,15 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    pids_limit: 128
+    mem_limit: ${CW_WORKSITES_MEMORY_LIMIT:-512m}
+    logging: *json-logging
 
   platform:
     build:
-      context: ${CW_PLATFORM_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-platform.git#74d437f1de28149e63bc5ec552326f3075ae6656}
+      context: ${CW_PLATFORM_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-platform.git#74ce5b52a1c9eedefdff992f7080b6532415213b}
     restart: unless-stopped
+    init: true
     depends_on:
       worksites:
         condition: service_healthy
@@ -44,6 +57,9 @@ services:
       CW_PORT: 8080
       CW_RATE_LIMIT_PER_MINUTE: ${CW_RATE_LIMIT_PER_MINUTE:-120}
       CW_ALLOWED_ORIGIN: ${CW_ALLOWED_ORIGIN:-https://crisisweave.netlify.app}
+      CW_TRUST_PROXY: "1"
+      CW_MAX_HTTP_WORKERS: ${CW_PLATFORM_HTTP_WORKERS:-64}
+      CW_HTTP_SOCKET_TIMEOUT: ${CW_HTTP_SOCKET_TIMEOUT:-10}
     volumes:
       - platform_data:/data
     networks:
@@ -64,10 +80,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    pids_limit: 160
+    mem_limit: ${CW_PLATFORM_MEMORY_LIMIT:-768m}
+    logging: *json-logging
 
   caddy:
     image: caddy:2.11.4-alpine
     restart: unless-stopped
+    init: true
     depends_on:
       platform:
         condition: service_healthy
@@ -95,10 +115,14 @@ services:
       - ALL
     cap_add:
       - NET_BIND_SERVICE
+    pids_limit: 128
+    mem_limit: ${CW_CADDY_MEMORY_LIMIT:-256m}
+    logging: *json-logging
 
   prometheus:
     image: prom/prometheus:v3.14.0
     restart: unless-stopped
+    init: true
     depends_on:
       platform:
         condition: service_healthy
@@ -108,7 +132,6 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=${CW_PROMETHEUS_RETENTION:-15d}
-      - --web.enable-lifecycle
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -123,10 +146,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    pids_limit: 128
+    mem_limit: ${CW_PROMETHEUS_MEMORY_LIMIT:-1g}
+    logging: *json-logging
 
   blackbox:
     image: prom/blackbox-exporter:v0.28.0
     restart: unless-stopped
+    init: true
     command:
       - --config.file=/etc/blackbox_exporter/config.yml
     volumes:
@@ -140,6 +167,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    pids_limit: 96
+    mem_limit: ${CW_BLACKBOX_MEMORY_LIMIT:-256m}
+    logging: *json-logging
 
 volumes:
   worksites_data:
