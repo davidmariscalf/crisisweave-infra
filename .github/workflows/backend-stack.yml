@@ -36,7 +36,12 @@ jobs:
         working-directory: deploy/stack
         env:
           CW_API_HOST: http://localhost
-        run: docker compose up -d
+        run: |
+          if ! docker compose up -d; then
+            docker compose ps -a
+            docker compose logs --no-color --tail=200 platform worksites caddy prometheus blackbox || true
+            exit 1
+          fi
       - name: Verify stack
         working-directory: deploy/stack
         env:
