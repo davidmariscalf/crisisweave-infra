@@ -20,6 +20,14 @@
       "status": "recommended_not_deployed"
     },
     {
+      "name": "Caddy",
+      "repository": "caddyserver/caddy",
+      "version": "2.11.4",
+      "release_tag": "v2.11.4",
+      "role": "backend_tls_reverse_proxy",
+      "status": "recommended_not_deployed"
+    },
+    {
       "name": "OpenBao",
       "repository": "openbao/openbao",
       "version": "2.6.2",
@@ -41,6 +49,22 @@
       "version": "0.19.1",
       "release_tag": "v0.19.1",
       "role": "encrypted_backup_and_restore",
+      "status": "recommended_not_deployed"
+    },
+    {
+      "name": "Prometheus",
+      "repository": "prometheus/prometheus",
+      "version": "3.14.0",
+      "release_tag": "v3.14.0",
+      "role": "central_metrics_and_alert_evaluation",
+      "status": "recommended_not_deployed"
+    },
+    {
+      "name": "blackbox_exporter",
+      "repository": "prometheus/blackbox_exporter",
+      "version": "0.28.0",
+      "release_tag": "v0.28.0",
+      "role": "http_tls_external_probes",
       "status": "recommended_not_deployed"
     },
     {
