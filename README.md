@@ -12,6 +12,16 @@ This repository is deliberately safe to make public. It contains deployment meta
 
 The custom alias remains pending until the external domain registry accepts the pull request and DNS propagates.
 
+## Free cloud deployment from a phone
+
+CrisisWeave has a standalone Oracle Cloud Infrastructure Resource Manager stack in the `oci-free-deploy` branch. Oracle runs Terraform in its own cloud, so this path does not require a personal computer to stay online or a local Terraform installation.
+
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/davidmariscalf/crisisweave-infra/archive/refs/heads/oci-free-deploy.zip)
+
+The template defaults are capped at 2 OCPUs, 12 GB RAM and a 50 GB boot volume, creates the network/firewall automatically, installs Docker on Ubuntu ARM, generates CrisisWeave backend secrets only on the VM, and starts the existing Compose stack. The branch is independently checked with `terraform fmt`, `terraform init`, `terraform validate` and bootstrap shell-syntax CI.
+
+See `deploy/OCI_FREE.md` for the mobile workflow, capacity caveats and the HTTPS boundary. Always Free eligibility and remaining quota are tenancy-wide Oracle properties, not a guarantee made by CrisisWeave.
+
 ## One-command backend stack
 
 `deploy/stack/` is the reproducible Docker Compose baseline for a small Linux/VPS deployment. It combines:
