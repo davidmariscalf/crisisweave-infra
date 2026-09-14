@@ -31,8 +31,7 @@ for path in ('/healthz', '/readyz', '/metrics'):
         print(path + ': ok')
 PY
 
-printf '%s\n' 'Checking public metrics are blocked at Caddy...'
-code="$(docker compose exec -T caddy wget -q -S -O /dev/null http://127.0.0.1:8081/healthz 2>&1 | awk '/HTTP\// {print $2}' | tail -1)"
-[ "$code" = "200" ] || { echo "internal Caddy health route failed: $code" >&2; exit 1; }
+printf '%s\n' 'Checking internal Caddy readiness route...'
+docker compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8081/healthz
 
 echo 'CrisisWeave stack verification passed.'
