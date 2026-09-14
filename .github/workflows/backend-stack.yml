@@ -23,6 +23,7 @@ jobs:
           sh -n bootstrap-admin.sh
           sh -n backup.sh
           sh -n restore-drill.sh
+          sh -n prepare-offsite-backup.sh
       - name: Create ephemeral CI environment
         working-directory: deploy/stack
         run: |
@@ -60,12 +61,23 @@ jobs:
             sleep 2
           done
           exit 1
-      - name: Backup and non-destructive restore drill
+      - name: Backup, restore drill and encrypted off-host bundle
         working-directory: deploy/stack
         run: |
           backup_dir="$(sh backup.sh /tmp/crisisweave-ci-backups)"
           test -n "$backup_dir"
           sh restore-drill.sh "$backup_dir"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+          age-keygen -o /tmp/crisisweave-age-key >/dev/null 2>&1
+          export CW_BACKUP_AGE_RECIPIENT="$(age-keygen -y /tmp/crisisweave-age-key)"
+          encrypted="$(sh prepare-offsite-backup.sh "$backup_dir" /tmp/crisisweave-offsite)"
+          test -s "$encrypted"
+          (cd "$(dirname "$encrypted")" && sha256sum -c "$(basename "$encrypted").sha256")
+          age -d -i /tmp/crisisweave-age-key "$encrypted" | tar -tf - >/tmp/crisisweave-offsite-files
+          for required in platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEALS.json SHA256SUMS METADATA; do
+            grep -qx "$required" /tmp/crisisweave-offsite-files
+          done
       - name: Tear down
         if: always()
         working-directory: deploy/stack
