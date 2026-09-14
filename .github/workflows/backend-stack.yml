@@ -1,0 +1,56 @@
+name: backend-stack
+on:
+  push:
+    paths:
+      - 'deploy/stack/**'
+      - '.github/workflows/backend-stack.yml'
+  pull_request:
+    paths:
+      - 'deploy/stack/**'
+      - '.github/workflows/backend-stack.yml'
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create ephemeral CI secrets
+        working-directory: deploy/stack
+        run: |
+          mkdir -p secrets
+          openssl rand -hex 32 > secrets/cw_token_pepper
+          openssl rand -hex 32 > secrets/cw_worksites_token
+          chmod 600 secrets/*
+      - name: Validate Compose model
+        working-directory: deploy/stack
+        env:
+          CW_API_HOST: http://localhost
+        run: docker compose config >/tmp/crisisweave-compose.yml
+      - name: Build application images
+        working-directory: deploy/stack
+        env:
+          CW_API_HOST: http://localhost
+        run: docker compose build worksites platform
+      - name: Start full stack
+        working-directory: deploy/stack
+        env:
+          CW_API_HOST: http://localhost
+        run: docker compose up -d
+      - name: Verify stack
+        working-directory: deploy/stack
+        env:
+          CW_API_HOST: http://localhost
+        run: |
+          trap 'docker compose logs --no-color --tail=200' ERR
+          for i in $(seq 1 30); do
+            if sh verify.sh; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Tear down
+        if: always()
+        working-directory: deploy/stack
+        env:
+          CW_API_HOST: http://localhost
+        run: docker compose down -v --remove-orphans
