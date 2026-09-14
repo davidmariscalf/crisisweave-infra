@@ -15,6 +15,7 @@ No application database port, worksite port, platform port or metrics endpoint i
 - Docker Engine with the Compose plugin
 - Git
 - OpenSSL
+- `age` when encrypted off-host backup export is enabled
 - DNS A/AAAA record for the API hostname pointing to the server
 - inbound TCP 80/443 (and UDP 443 if HTTP/3 is desired)
 
@@ -67,15 +68,7 @@ Prometheus is available only from the host at `http://127.0.0.1:9090` by default
 
 The platform exports only low-cardinality operational metrics. It does not put user IDs, organisation IDs, worksite IDs, bearer tokens, source URLs or filesystem paths into metric labels. The stack monitors database health, worksite reachability, HTTP errors, worker capacity and free data-volume space.
 
-`alerts.yml` contains internal Prometheus rules for:
-
-- platform/private SQLite health failure
-- worksite service outage
-- less than 10 percent data-volume space free
-- repeated platform 5xx errors
-- failure of the internal Caddy readiness probe
-
-These rules create Prometheus alert states only. **They do not send notifications by themselves.** Notification delivery still requires Alertmanager or another explicitly configured receiver.
+`alerts.yml` contains internal Prometheus rules for platform/private SQLite health failure, worksite service outage, low data-volume space, repeated platform 5xx errors and internal Caddy readiness failure. These rules create Prometheus alert states only. They do not send notifications by themselves; delivery still requires an explicitly configured Alertmanager or equivalent receiver.
 
 ## Verified backups and restore drills
 
@@ -83,32 +76,42 @@ Create an online backup while services remain running:
 
 ```bash
 backup_dir="$(sh backup.sh)"
-echo "$backup_dir"
-```
-
-`backup.sh` uses SQLite's online backup API for `platform.db`, `private.db` and `worksites.db`, runs `PRAGMA integrity_check`, writes SHA256 checksums and records the pinned application revisions. The three database files are individually transactionally valid snapshots; they are not presented as a distributed cross-service transaction.
-
-Test a backup without touching live data:
-
-```bash
 sh restore-drill.sh "$backup_dir"
 ```
 
-The drill verifies every SHA256 and opens each SQLite snapshot read-only before running another integrity check. It deliberately never writes into live Docker volumes.
+`backup.sh` uses SQLite's online backup API for `platform.db`, `private.db` and `worksites.db`, runs `PRAGMA integrity_check`, writes SHA256 checksums, records the pinned application revisions and seals both ordered audit histories in `AUDIT_SEALS.json`. The three database files are individually transactionally valid snapshots; they are not presented as a distributed cross-service transaction.
 
-Copy verified backups off-host and encrypt them. The separate Litestream/restic profiles remain the recommended continuous/off-host disaster-recovery layer. A backup that has never passed a restore drill should not be treated as proven recoverable.
+`restore-drill.sh` verifies every file hash, both audit chains, required audit immutability triggers and SQLite integrity while opening the snapshots read-only. It deliberately never writes into live Docker volumes.
 
-## Updates
+### Encrypted off-host export
 
-The application build contexts are pinned to reviewed Git commit SHAs in `compose.yaml`. To upgrade, update the pinned refs deliberately, run CI, then:
+Generate an `age` identity on a trusted device or recovery vault, not on the application server. Keep the private key off-host. Put only its public recipient on the server for the export command:
 
 ```bash
-docker compose build --pull
-docker compose up -d
-sh verify.sh
+export CW_BACKUP_AGE_RECIPIENT='age1...public-recipient...'
+encrypted="$(sh prepare-offsite-backup.sh "$backup_dir" /secure/offsite-staging)"
+echo "$encrypted"
 ```
 
-CI builds the pinned application revisions, starts the complete stack, validates Prometheus configuration/rules, runs readiness checks, makes a real three-database backup and performs the non-destructive restore drill before the deployment baseline is considered green.
+`prepare-offsite-backup.sh` refuses to export a backup until the full restore drill passes. It streams the verified backup set directly from `tar` into `age`, so it does not create a plaintext tar archive, and writes a SHA256 for the encrypted bundle. Move that encrypted file and checksum to genuinely separate storage. The public recipient is not a decryption secret; the corresponding `age` private identity must stay outside the CrisisWeave host and repository.
+
+Litestream/restic remain useful for continuous or provider-specific replication. A local backup alone is not off-host recovery, and a backup that has never passed a restore drill should not be treated as proven recoverable.
+
+## Verified updates
+
+Application build contexts in `compose.yaml` are pinned to reviewed Git commit SHAs. Do not deploy `main`, a branch name or a floating tag directly.
+
+After a candidate infrastructure commit has a successful `backend-stack` GitHub Actions run, apply that exact 40-character SHA with:
+
+```bash
+sh update-pinned-release.sh <exact-40-character-infra-commit-sha>
+```
+
+The updater fails closed unless the target is an exact lowercase SHA in `origin/main` and public GitHub Actions metadata shows a successful `backend-stack` run for that exact commit. Before changing code it creates a verified pre-update backup; when `CW_BACKUP_AGE_RECIPIENT` is configured it also creates an encrypted export. It preserves the existing ignored `.env`, validates the target stack, builds the pinned application revisions, starts them and runs `verify.sh`.
+
+If application of the new revision fails, the updater checks the previous infrastructure commit back out and rebuilds the previous stack definition. It deliberately does not overwrite databases automatically. If rollback cannot restore health, use the pre-update verified backup through an explicit maintenance/recovery procedure rather than an automatic destructive restore.
+
+CI itself builds the pinned application revisions, starts the complete stack, validates Prometheus configuration and rules, runs readiness checks, creates a real three-database backup, performs the non-destructive restore drill and exercises encrypted export before a deployment baseline is considered green.
 
 ## Operations
 
