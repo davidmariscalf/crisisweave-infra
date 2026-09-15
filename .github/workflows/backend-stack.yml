@@ -25,6 +25,8 @@ jobs:
           sh -n restore-drill.sh
           sh -n prepare-offsite-backup.sh
           sh -n update-pinned-release.sh
+          sh -n operational-maintenance.sh
+          python -m py_compile generate-alertmanager-config.py go-live-check.py
           if sh update-pinned-release.sh main >/tmp/cw-update-invalid.out 2>&1; then
             echo 'release updater accepted a mutable branch name' >&2
             exit 1
@@ -41,12 +43,31 @@ jobs:
       - name: Validate Compose model
         working-directory: deploy/stack
         run: docker compose config >/tmp/crisisweave-compose.yml
-      - name: Validate Prometheus configuration and rules
+      - name: Validate monitoring configuration
         working-directory: deploy/stack
         run: |
-          docker compose pull prometheus
+          docker compose pull prometheus alertmanager
           docker compose run --rm --no-deps --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yml
           docker compose run --rm --no-deps --entrypoint /bin/promtool prometheus check rules /etc/prometheus/alerts.yml
+          docker compose run --rm --no-deps --entrypoint /bin/amtool alertmanager check-config /etc/alertmanager/alertmanager.yml
+      - name: Validate fail-closed production configuration gate
+        working-directory: deploy/stack
+        run: |
+          cp .env /tmp/cw-dev.env
+          sed -i 's|^CW_DEPLOYMENT_ENV=.*|CW_DEPLOYMENT_ENV=production|' .env
+          sed -i 's|^CW_API_HOST=.*|CW_API_HOST=api.ci-crisisweave.dev|' .env
+          sed -i 's|^CW_ALLOWED_ORIGIN=.*|CW_ALLOWED_ORIGIN=https://app.ci-crisisweave.dev|' .env
+          sed -i 's|^CW_ALERTMANAGER_CONFIG=.*|CW_ALERTMANAGER_CONFIG=./alertmanager.generated.yml|' .env
+          sed -i 's|^CW_ALERT_WEBHOOK_URL=.*|CW_ALERT_WEBHOOK_URL=https://hooks.ci-crisisweave.dev/alerts|' .env
+          sed -i 's|^CW_BACKUP_AGE_RECIPIENT=.*|CW_BACKUP_AGE_RECIPIENT=age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq|' .env
+          sed -i 's|^CW_INCIDENT_RESPONSE_CONTACT=.*|CW_INCIDENT_RESPONSE_CONTACT=ci-on-call|' .env
+          sed -i 's|^CW_PRIVACY_CONTACT=.*|CW_PRIVACY_CONTACT=ci-privacy|' .env
+          sed -i 's|^CW_BACKUP_OWNER=.*|CW_BACKUP_OWNER=ci-recovery|' .env
+          python generate-alertmanager-config.py
+          python go-live-check.py --skip-dns | tee /tmp/cw-go-live.json
+          python -c "import json; d=json.load(open('/tmp/cw-go-live.json')); assert d['ok'] and d['dns_checked'] is False"
+          mv /tmp/cw-dev.env .env
+          chmod 600 .env
       - name: Build application images
         working-directory: deploy/stack
         run: docker compose build worksites platform
@@ -55,7 +76,7 @@ jobs:
         run: |
           if ! docker compose up -d; then
             docker compose ps -a
-            docker compose logs --no-color --tail=200 platform worksites caddy prometheus blackbox || true
+            docker compose logs --no-color --tail=200 platform worksites caddy prometheus alertmanager blackbox || true
             exit 1
           fi
       - name: Verify stack
@@ -67,6 +88,9 @@ jobs:
             sleep 2
           done
           exit 1
+      - name: Exercise operational maintenance dry-run
+        working-directory: deploy/stack
+        run: sh operational-maintenance.sh
       - name: Backup, restore drill and encrypted off-host bundle
         working-directory: deploy/stack
         run: |
