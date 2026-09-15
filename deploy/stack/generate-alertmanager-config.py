@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parent
 ENV_PATH = ROOT / ".env"
 OUT_PATH = ROOT / "alertmanager.generated.yml"
+PLACEHOLDER_HOSTS = {"example.com", "example.org", "example.net", "example.invalid", "localhost"}
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -34,7 +35,8 @@ def validated_webhook(value: str) -> str:
         raise SystemExit("CW_ALERT_WEBHOOK_URL must be an https:// URL")
     if parsed.username or parsed.password:
         raise SystemExit("CW_ALERT_WEBHOOK_URL must not contain URL userinfo credentials")
-    if parsed.hostname in {"example.com", "example.org", "example.invalid", "localhost"}:
+    host = (parsed.hostname or "").lower()
+    if host in PLACEHOLDER_HOSTS or host.endswith((".example", ".invalid", ".local")):
         raise SystemExit("CW_ALERT_WEBHOOK_URL must point to a real external alert receiver")
     return value
 
