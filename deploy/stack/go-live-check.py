@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import ipaddress
 import json
 import re
+import socket
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -40,7 +42,7 @@ def require(errors: list[str], condition: bool, message: str) -> None:
 
 def reserved_host(host: str) -> bool:
     lowered = host.lower().rstrip(".")
-    return lowered in PLACEHOLDER_HOSTS or lowered.endswith((".example", ".invalid", ".local"))
+    return lowered in PLACEHOLDER_HOSTS or lowered.endswith((".example", ".invalid", ".local", ".test"))
 
 
 def valid_host(host: str) -> bool:
@@ -56,15 +58,28 @@ def valid_host(host: str) -> bool:
     return len(labels) >= 2 and all(HOST_LABEL.fullmatch(label) for label in labels)
 
 
-def valid_https_url(value: str) -> bool:
+def url_host(value: str) -> str | None:
     parsed = urlparse(value)
     if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+        return None
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if not host or reserved_host(host):
+        return None
+    return host
+
+
+def resolves(host: str) -> bool:
+    try:
+        return bool(socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM))
+    except socket.gaierror:
         return False
-    host = (parsed.hostname or "").lower()
-    return bool(host) and not reserved_host(host)
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Fail-closed CrisisWeave production go-live checks")
+    parser.add_argument("--skip-dns", action="store_true", help="CI/config validation only; do not use for a real go-live")
+    args = parser.parse_args()
+
     try:
         env = load_env(ENV_PATH)
     except RuntimeError as exc:
@@ -75,10 +90,12 @@ def main() -> int:
     warnings: list[str] = []
 
     require(errors, env.get("CW_DEPLOYMENT_ENV") == "production", "CW_DEPLOYMENT_ENV must be production")
-    host = env.get("CW_API_HOST", "")
-    require(errors, valid_host(host), "CW_API_HOST must be a real DNS hostname, not an IP or placeholder")
-    require(errors, valid_https_url(env.get("CW_ALLOWED_ORIGIN", "")), "CW_ALLOWED_ORIGIN must be a real https:// origin")
-    require(errors, valid_https_url(env.get("CW_ALERT_WEBHOOK_URL", "")), "CW_ALERT_WEBHOOK_URL must be a real https:// receiver")
+    api_host = env.get("CW_API_HOST", "").strip().lower().rstrip(".")
+    allowed_origin_host = url_host(env.get("CW_ALLOWED_ORIGIN", ""))
+    alert_host = url_host(env.get("CW_ALERT_WEBHOOK_URL", ""))
+    require(errors, valid_host(api_host), "CW_API_HOST must be a real DNS hostname, not an IP or placeholder")
+    require(errors, allowed_origin_host is not None, "CW_ALLOWED_ORIGIN must be a real https:// origin")
+    require(errors, alert_host is not None, "CW_ALERT_WEBHOOK_URL must be a real https:// receiver")
     require(errors, env.get("CW_ALERTMANAGER_CONFIG") == "./alertmanager.generated.yml", "CW_ALERTMANAGER_CONFIG must select ./alertmanager.generated.yml in production")
     require(errors, AGE_RECIPIENT.fullmatch(env.get("CW_BACKUP_AGE_RECIPIENT", "")) is not None, "CW_BACKUP_AGE_RECIPIENT must be a valid age1 public recipient")
     require(errors, HEX64.fullmatch(env.get("CW_TOKEN_PEPPER", "")) is not None, "CW_TOKEN_PEPPER must contain at least 256 bits of hex entropy")
@@ -90,15 +107,27 @@ def main() -> int:
 
     try:
         retention = int(env.get("CW_DATA_RETENTION_DAYS", ""))
+        token_retention = int(env.get("CW_TOKEN_RETENTION_DAYS", ""))
     except ValueError:
-        retention = 0
+        retention = token_retention = 0
     require(errors, 1 <= retention <= 3650, "CW_DATA_RETENTION_DAYS must be between 1 and 3650")
+    require(errors, 1 <= token_retention <= 3650, "CW_TOKEN_RETENTION_DAYS must be between 1 and 3650")
 
     if not ALERTMANAGER_PATH.is_file():
         errors.append("alertmanager.generated.yml is missing; run python3 generate-alertmanager-config.py")
     else:
         mode = ALERTMANAGER_PATH.stat().st_mode & 0o777
         require(errors, mode & 0o077 == 0, "alertmanager.generated.yml must not be group/world-readable")
+
+    if not args.skip_dns:
+        if valid_host(api_host):
+            require(errors, resolves(api_host), f"CW_API_HOST does not resolve in DNS: {api_host}")
+        if allowed_origin_host:
+            require(errors, resolves(allowed_origin_host), f"CW_ALLOWED_ORIGIN hostname does not resolve in DNS: {allowed_origin_host}")
+        if alert_host:
+            require(errors, resolves(alert_host), f"CW_ALERT_WEBHOOK_URL hostname does not resolve in DNS: {alert_host}")
+    else:
+        warnings.append("DNS resolution checks were skipped; this mode is for CI/config validation only")
 
     if env.get("CW_ALLOWED_ORIGIN", "").endswith(".netlify.app"):
         warnings.append("browser origin still uses the Netlify default hostname; a controlled custom domain is recommended")
@@ -110,12 +139,14 @@ def main() -> int:
     result = {
         "ok": True,
         "deployment_env": "production",
-        "api_host": host,
+        "api_host": api_host,
         "allowed_origin": env["CW_ALLOWED_ORIGIN"],
         "alert_delivery": "configured",
         "offsite_backup_encryption": "configured",
-        "retention_days": retention,
+        "private_retention_days": retention,
+        "token_retention_days": token_retention,
         "named_operational_owners": True,
+        "dns_checked": not args.skip_dns,
         "warnings": warnings,
     }
     print(json.dumps(result, indent=2))
