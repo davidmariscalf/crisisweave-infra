@@ -36,20 +36,20 @@ read_numeric_env() {
 }
 
 private_days="$(read_numeric_env CW_DATA_RETENTION_DAYS 90)"
-token_days="$(read_numeric_env CW_TOKEN_RETENTION_DAYS 30)"
+credential_days="$(read_numeric_env CW_TOKEN_RETENTION_DAYS 30)"
 
 printf '%s\n' 'Checking platform audit immutability before maintenance...'
 docker compose exec -T platform python audit_guard.py verify >/dev/null
 printf '%s\n' 'Checking worksite audit immutability before maintenance...'
 docker compose exec -T worksites python audit_guard.py verify >/dev/null
 
-printf '%s\n' "Private-data retention report (${private_days} days) and credential retention (${token_days} days):"
+printf '%s\n' "Private-data retention report (${private_days} days) and credential retention (${credential_days} days):"
 if [ "$mode" = "apply" ]; then
   docker compose exec -T platform sh -c \
-    'python maintenance.py --db "$CW_DB" --private-db "$CW_PRIVATE_DB" --pepper "$CW_TOKEN_PEPPER" --private-retention-days '"$private_days"' --token-retention-days '"$token_days"' --apply'
+    'python maintenance.py --db "$CW_DB" --private-db "$CW_PRIVATE_DB" --pepper "$CW_TOKEN_PEPPER" --private-retention-days '"$private_days"' --token-retention-days '"$credential_days"' --apply'
 else
   docker compose exec -T platform sh -c \
-    'python maintenance.py --db "$CW_DB" --private-db "$CW_PRIVATE_DB" --pepper "$CW_TOKEN_PEPPER" --private-retention-days '"$private_days"' --token-retention-days '"$token_days"''
+    'python maintenance.py --db "$CW_DB" --private-db "$CW_PRIVATE_DB" --pepper "$CW_TOKEN_PEPPER" --private-retention-days '"$private_days"' --token-retention-days '"$credential_days"''
 fi
 
 printf '%s\n' 'Open-work freshness report:'
