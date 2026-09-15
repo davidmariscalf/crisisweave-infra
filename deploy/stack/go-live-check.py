@@ -107,11 +107,11 @@ def main() -> int:
 
     try:
         retention = int(env.get("CW_DATA_RETENTION_DAYS", ""))
-        token_retention = int(env.get("CW_TOKEN_RETENTION_DAYS", ""))
+        credential_retention = int(env.get("CW_TOKEN_RETENTION_DAYS", ""))
     except ValueError:
-        retention = token_retention = 0
+        retention = credential_retention = 0
     require(errors, 1 <= retention <= 3650, "CW_DATA_RETENTION_DAYS must be between 1 and 3650")
-    require(errors, 1 <= token_retention <= 3650, "CW_TOKEN_RETENTION_DAYS must be between 1 and 3650")
+    require(errors, 1 <= credential_retention <= 3650, "CW_TOKEN_RETENTION_DAYS must be between 1 and 3650")
 
     if not ALERTMANAGER_PATH.is_file():
         errors.append("alertmanager.generated.yml is missing; run python3 generate-alertmanager-config.py")
@@ -144,7 +144,7 @@ def main() -> int:
         "alert_delivery": "configured",
         "offsite_backup_encryption": "configured",
         "private_retention_days": retention,
-        "token_retention_days": token_retention,
+        "credential_retention_days": credential_retention,
         "named_operational_owners": True,
         "dns_checked": not args.skip_dns,
         "warnings": warnings,
