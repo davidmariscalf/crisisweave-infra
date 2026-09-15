@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import re
-import socket
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -12,6 +11,7 @@ ROOT = Path(__file__).resolve().parent
 ENV_PATH = ROOT / ".env"
 ALERTMANAGER_PATH = ROOT / "alertmanager.generated.yml"
 HEX64 = re.compile(r"^[0-9a-fA-F]{64,}$")
+AGE_RECIPIENT = re.compile(r"^age1[0-9a-z]{50,}$")
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -41,10 +41,11 @@ def valid_host(host: str) -> bool:
         return False
     if lowered.endswith((".example", ".invalid", ".local")):
         return False
-    return "." in lowered and " " not in lowered
+    labels = lowered.split(".")
+    return len(labels) >= 2 and all(label and len(label) <= 63 and label.strip("-") == label for label in labels)
 
 
-def valid_https_url(value: str, *, allow_netlify: bool = True) -> bool:
+def valid_https_url(value: str) -> bool:
     parsed = urlparse(value)
     if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
         return False
@@ -52,8 +53,6 @@ def valid_https_url(value: str, *, allow_netlify: bool = True) -> bool:
     if host in {"localhost", "example.com", "example.org", "example.invalid"}:
         return False
     if host.endswith((".example", ".invalid", ".local")):
-        return False
-    if not allow_netlify and host.endswith(".netlify.app"):
         return False
     return True
 
@@ -73,7 +72,8 @@ def main() -> int:
     require(errors, valid_host(host), "CW_API_HOST must be a real DNS hostname")
     require(errors, valid_https_url(env.get("CW_ALLOWED_ORIGIN", "")), "CW_ALLOWED_ORIGIN must be a real https:// origin")
     require(errors, valid_https_url(env.get("CW_ALERT_WEBHOOK_URL", "")), "CW_ALERT_WEBHOOK_URL must be a real https:// receiver")
-    require(errors, env.get("CW_BACKUP_AGE_RECIPIENT", "").startswith("age1"), "CW_BACKUP_AGE_RECIPIENT must be an age public recipient")
+    require(errors, env.get("CW_ALERTMANAGER_CONFIG") == "./alertmanager.generated.yml", "CW_ALERTMANAGER_CONFIG must select ./alertmanager.generated.yml in production")
+    require(errors, AGE_RECIPIENT.fullmatch(env.get("CW_BACKUP_AGE_RECIPIENT", "")) is not None, "CW_BACKUP_AGE_RECIPIENT must be a valid age1 public recipient")
     require(errors, HEX64.fullmatch(env.get("CW_TOKEN_PEPPER", "")) is not None, "CW_TOKEN_PEPPER must contain at least 256 bits of hex entropy")
     require(errors, HEX64.fullmatch(env.get("CW_WORKSITES_TOKEN", "")) is not None, "CW_WORKSITES_TOKEN must contain at least 256 bits of hex entropy")
     require(errors, env.get("CW_TOKEN_PEPPER") != env.get("CW_WORKSITES_TOKEN"), "platform pepper and internal worksite token must be distinct")
@@ -88,13 +88,13 @@ def main() -> int:
     require(errors, 1 <= retention <= 3650, "CW_DATA_RETENTION_DAYS must be between 1 and 3650")
 
     if not ALERTMANAGER_PATH.is_file():
-        errors.append("alertmanager.generated.yml is missing; run python generate-alertmanager-config.py")
+        errors.append("alertmanager.generated.yml is missing; run python3 generate-alertmanager-config.py")
     else:
         mode = ALERTMANAGER_PATH.stat().st_mode & 0o777
         require(errors, mode & 0o077 == 0, "alertmanager.generated.yml must not be group/world-readable")
 
-    if host.endswith(".netlify.app"):
-        warnings.append("API host is a Netlify hostname; a dedicated API hostname is recommended")
+    if env.get("CW_ALLOWED_ORIGIN", "").endswith(".netlify.app"):
+        warnings.append("browser origin still uses the Netlify default hostname; a controlled custom domain is recommended")
 
     if errors:
         print(json.dumps({"ok": False, "errors": errors, "warnings": warnings}, indent=2), file=sys.stderr)
