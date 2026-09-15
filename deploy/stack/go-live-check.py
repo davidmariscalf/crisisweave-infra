@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
 import sys
@@ -12,6 +13,8 @@ ENV_PATH = ROOT / ".env"
 ALERTMANAGER_PATH = ROOT / "alertmanager.generated.yml"
 HEX64 = re.compile(r"^[0-9a-fA-F]{64,}$")
 AGE_RECIPIENT = re.compile(r"^age1[0-9a-z]{50,}$")
+HOST_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+PLACEHOLDER_HOSTS = {"localhost", "example.com", "example.org", "example.net", "example.invalid", "api.example.org"}
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -35,14 +38,22 @@ def require(errors: list[str], condition: bool, message: str) -> None:
         errors.append(message)
 
 
+def reserved_host(host: str) -> bool:
+    lowered = host.lower().rstrip(".")
+    return lowered in PLACEHOLDER_HOSTS or lowered.endswith((".example", ".invalid", ".local"))
+
+
 def valid_host(host: str) -> bool:
     lowered = host.strip().lower().rstrip(".")
-    if not lowered or lowered in {"localhost", "example.org", "example.com", "api.example.org"}:
+    if not lowered or reserved_host(lowered):
         return False
-    if lowered.endswith((".example", ".invalid", ".local")):
+    try:
+        ipaddress.ip_address(lowered)
         return False
+    except ValueError:
+        pass
     labels = lowered.split(".")
-    return len(labels) >= 2 and all(label and len(label) <= 63 and label.strip("-") == label for label in labels)
+    return len(labels) >= 2 and all(HOST_LABEL.fullmatch(label) for label in labels)
 
 
 def valid_https_url(value: str) -> bool:
@@ -50,11 +61,7 @@ def valid_https_url(value: str) -> bool:
     if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
         return False
     host = (parsed.hostname or "").lower()
-    if host in {"localhost", "example.com", "example.org", "example.invalid"}:
-        return False
-    if host.endswith((".example", ".invalid", ".local")):
-        return False
-    return True
+    return bool(host) and not reserved_host(host)
 
 
 def main() -> int:
@@ -69,7 +76,7 @@ def main() -> int:
 
     require(errors, env.get("CW_DEPLOYMENT_ENV") == "production", "CW_DEPLOYMENT_ENV must be production")
     host = env.get("CW_API_HOST", "")
-    require(errors, valid_host(host), "CW_API_HOST must be a real DNS hostname")
+    require(errors, valid_host(host), "CW_API_HOST must be a real DNS hostname, not an IP or placeholder")
     require(errors, valid_https_url(env.get("CW_ALLOWED_ORIGIN", "")), "CW_ALLOWED_ORIGIN must be a real https:// origin")
     require(errors, valid_https_url(env.get("CW_ALERT_WEBHOOK_URL", "")), "CW_ALERT_WEBHOOK_URL must be a real https:// receiver")
     require(errors, env.get("CW_ALERTMANAGER_CONFIG") == "./alertmanager.generated.yml", "CW_ALERTMANAGER_CONFIG must select ./alertmanager.generated.yml in production")
