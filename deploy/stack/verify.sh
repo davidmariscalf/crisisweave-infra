@@ -73,7 +73,18 @@ if docker compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8081/metri
   exit 1
 fi
 
-printf '%s\n' 'Checking Prometheus runtime health...'
+printf '%s\n' 'Checking Prometheus and Alertmanager runtime health...'
 docker compose exec -T prometheus /bin/promtool check config /etc/prometheus/prometheus.yml >/dev/null
+docker compose exec -T prometheus /bin/promtool check rules /etc/prometheus/alerts.yml >/dev/null
+docker compose exec -T alertmanager wget -q -O /dev/null http://127.0.0.1:9093/-/ready
+
+printf '%s\n' 'Checking Prometheus sees its Alertmanager target...'
+docker compose exec -T prometheus wget -q -O - http://127.0.0.1:9090/api/v1/alertmanagers | grep -q 'alertmanager:9093'
+
+if [ -f .env ] && grep -Eq '^CW_DEPLOYMENT_ENV=production$' .env; then
+  printf '%s\n' 'Production deployment requested; running fail-closed go-live gate...'
+  PYTHON_BIN="$(command -v python3 || command -v python)"
+  "$PYTHON_BIN" go-live-check.py
+fi
 
 echo 'CrisisWeave stack verification passed.'
