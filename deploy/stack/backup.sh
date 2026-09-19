@@ -122,12 +122,6 @@ seal = {
 destination.write_text(json.dumps(seal, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 PY
 
-(
-  cd "$out"
-  sha256sum platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEALS.json > SHA256SUMS
-)
-chmod 600 "$out"/*.sqlite3 "$out/AUDIT_SEALS.json" "$out/SHA256SUMS"
-
 platform_commit="$(python3 -c 'import json; print(json.load(open("release-pins.json", encoding="utf-8"))["platform"]["commit"])')"
 worksites_commit="$(python3 -c 'import json; print(json.load(open("release-pins.json", encoding="utf-8"))["worksites"]["commit"])')"
 
@@ -138,6 +132,11 @@ platform_commit=$platform_commit
 worksites_commit=$worksites_commit
 audit_seals=AUDIT_SEALS.json
 EOF
-chmod 600 "$out/METADATA"
+
+(
+  cd "$out"
+  sha256sum platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEALS.json METADATA > SHA256SUMS
+)
+chmod 600 "$out"/*.sqlite3 "$out/AUDIT_SEALS.json" "$out/METADATA" "$out/SHA256SUMS"
 
 printf '%s\n' "$out"
