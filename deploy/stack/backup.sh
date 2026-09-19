@@ -128,11 +128,14 @@ PY
 )
 chmod 600 "$out"/*.sqlite3 "$out/AUDIT_SEALS.json" "$out/SHA256SUMS"
 
+platform_commit="$(python3 -c 'import json; print(json.load(open("release-pins.json", encoding="utf-8"))["platform"]["commit"])')"
+worksites_commit="$(python3 -c 'import json; print(json.load(open("release-pins.json", encoding="utf-8"))["worksites"]["commit"])')"
+
 cat > "$out/METADATA" <<EOF
 created_at=$stamp
 format=crisisweave-stack-backup-v3
-platform_commit=9e7aa0d2aaaf2ecb36688e1632e50da4c1218563
-worksites_commit=c807498b79a050b4d17a040e58bc02fe53df3069
+platform_commit=$platform_commit
+worksites_commit=$worksites_commit
 audit_seals=AUDIT_SEALS.json
 EOF
 chmod 600 "$out/METADATA"
