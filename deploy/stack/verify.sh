@@ -8,6 +8,10 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+printf '%s\n' 'Checking canonical application release pins...'
+PYTHON_BIN="$(command -v python3 || command -v python)"
+"$PYTHON_BIN" check-release-pins.py >/dev/null
+
 printf '%s\n' 'Checking container state...'
 docker compose ps
 
