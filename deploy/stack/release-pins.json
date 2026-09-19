@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "worksites": {
+    "repository": "davidmariscalf/crisisweave-worksites",
+    "commit": "128eaa4245cf0eaccc4c5f2d92e86a19be37888c"
+  },
+  "platform": {
+    "repository": "davidmariscalf/crisisweave-platform",
+    "commit": "5512a4581f3aa58cffdcb1eff28fef4826079136"
+  }
+}
