@@ -85,9 +85,29 @@ The base stack deploys Caddy, Prometheus and blackbox_exporter. Identity, manage
 
 The profiles deliberately distinguish configuration readiness from production deployment.
 
-## Netlify Drop
+## Netlify build provenance
 
-If Netlify Drop is used, upload the **entire `site/` directory**, not only `index.html`. The directory contains `_headers`, `_redirects`, `health.json` and the other public deployment metadata that make the static deployment match the repository configuration.
+For a source-linked Netlify deployment, `netlify.toml` runs:
+
+```bash
+python scripts/build-site.py
+```
+
+and publishes `dist/`. The builder copies the public site and stamps both `build.json` and `health.json` with the exact 40-character source revision from Netlify's `COMMIT_REF` (or the local Git revision when run outside Netlify).
+
+This makes a deployed public site traceable back to reviewed source without embedding credentials in the repository.
+
+### Manual Drop fallback
+
+If Netlify Drop is used, build the stamped directory first:
+
+```bash
+python scripts/build-site.py --revision "$(git rev-parse HEAD)"
+```
+
+Then upload the **entire `dist/` directory**, not only `index.html`. It contains the deploy-safe headers/redirects, health metadata and `build.json` provenance record.
+
+A manual Drop is still less desirable than a source-linked deployment because Netlify itself will not attach a Git commit to the deploy record. The embedded revision at least makes the served files auditable until the account is linked to Git.
 
 No Netlify token, API key or password is required inside this repository.
 
