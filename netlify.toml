@@ -1,5 +1,6 @@
 [build]
-  publish = "site"
+  command = "python scripts/build-site.py"
+  publish = "dist"
 
 [[headers]]
   for = "/*"
