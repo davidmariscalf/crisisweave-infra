@@ -81,7 +81,7 @@ sh restore-drill.sh "$backup_dir"
 
 `backup.sh` uses SQLite's online backup API for `platform.db`, `private.db` and `worksites.db`, runs `PRAGMA integrity_check`, writes SHA256 checksums, records the exact application revisions from `release-pins.json` and seals both ordered audit histories in `AUDIT_SEALS.json`. The three database files are individually transactionally valid snapshots; they are not presented as a distributed cross-service transaction.
 
-`restore-drill.sh` verifies every file hash, both audit chains, required audit immutability triggers and SQLite integrity while opening the snapshots read-only. It deliberately never writes into live Docker volumes.
+`restore-drill.sh` verifies every file hash, both audit chains, required audit immutability triggers, SQLite integrity and the backup release metadata while opening the snapshots read-only. It validates that recorded application revisions are full immutable SHAs and explicitly reports when a backup came from a different application release, without rejecting a valid older backup. It deliberately never writes into live Docker volumes.
 
 ### Encrypted off-host export
 
