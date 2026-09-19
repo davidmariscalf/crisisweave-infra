@@ -38,6 +38,8 @@ def main() -> int:
     for key in ("platform_commit=$platform_commit", "worksites_commit=$worksites_commit"):
         if key not in backup:
             raise SystemExit(f"backup metadata is missing {key}")
+    if re.search(r"^(?:platform|worksites)_commit=[0-9a-f]{40}$", backup, re.MULTILINE):
+        raise SystemExit("backup.sh contains a legacy hard-coded application revision")
 
     bootstrap = (ROOT / "bootstrap-admin.sh").read_text(encoding="utf-8")
     if "crisisweave_platform.py bootstrap" not in bootstrap:

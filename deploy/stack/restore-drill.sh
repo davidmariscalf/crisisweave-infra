@@ -7,6 +7,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 backup="$1"
+script_dir="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 for file in platform.sqlite3 private.sqlite3 worksites.sqlite3 AUDIT_SEALS.json SHA256SUMS METADATA; do
   if [ ! -f "$backup/$file" ]; then
     echo "missing backup file: $file" >&2
@@ -19,7 +20,7 @@ done
   sha256sum -c SHA256SUMS
 )
 
-python3 - "$backup" <<'PY'
+python3 - "$backup" "$script_dir/release-pins.json" <<'PY'
 import hashlib
 import json
 import pathlib
@@ -27,6 +28,37 @@ import sqlite3
 import sys
 
 root = pathlib.Path(sys.argv[1])
+pins_path = pathlib.Path(sys.argv[2])
+
+metadata = {}
+for raw in (root / "METADATA").read_text(encoding="utf-8").splitlines():
+    if not raw.strip() or "=" not in raw:
+        continue
+    key, value = raw.split("=", 1)
+    metadata[key.strip()] = value.strip()
+
+if metadata.get("format") != "crisisweave-stack-backup-v3":
+    raise SystemExit("unsupported or missing backup metadata format")
+if metadata.get("audit_seals") != "AUDIT_SEALS.json":
+    raise SystemExit("backup metadata does not reference AUDIT_SEALS.json")
+for key in ("platform_commit", "worksites_commit"):
+    value = metadata.get(key, "")
+    if len(value) != 40 or any(ch not in "0123456789abcdef" for ch in value):
+        raise SystemExit(f"backup metadata has invalid {key}")
+
+pins = json.loads(pins_path.read_text(encoding="utf-8"))
+current = {
+    "platform_commit": pins["platform"]["commit"],
+    "worksites_commit": pins["worksites"]["commit"],
+}
+if any(metadata[key] != value for key, value in current.items()):
+    print(
+        "backup revision note: backup was created by a different application release "
+        f"(platform={metadata['platform_commit']}, worksites={metadata['worksites_commit']})"
+    )
+else:
+    print("backup application revisions match current release pins")
+
 for name in ("platform.sqlite3", "private.sqlite3", "worksites.sqlite3"):
     path = root / name
     con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
