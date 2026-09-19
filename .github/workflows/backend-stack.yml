@@ -26,7 +26,8 @@ jobs:
           sh -n prepare-offsite-backup.sh
           sh -n update-pinned-release.sh
           sh -n operational-maintenance.sh
-          python -m py_compile generate-alertmanager-config.py go-live-check.py
+          python -m py_compile generate-alertmanager-config.py go-live-check.py check-release-pins.py
+          python check-release-pins.py
           if sh update-pinned-release.sh main >/tmp/cw-update-invalid.out 2>&1; then
             echo 'release updater accepted a mutable branch name' >&2
             exit 1
