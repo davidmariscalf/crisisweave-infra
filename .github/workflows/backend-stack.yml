@@ -98,6 +98,15 @@ jobs:
           backup_dir="$(sh backup.sh /tmp/crisisweave-ci-backups)"
           test -n "$backup_dir"
           sh restore-drill.sh "$backup_dir"
+          tampered=/tmp/crisisweave-ci-tampered
+          rm -rf "$tampered"
+          cp -a "$backup_dir" "$tampered"
+          sed -i 's/^platform_commit=./platform_commit=0/' "$tampered/METADATA"
+          if sh restore-drill.sh "$tampered" >/tmp/cw-tampered-restore.out 2>&1; then
+            echo 'restore drill accepted tampered release metadata' >&2
+            exit 1
+          fi
+          grep -q 'METADATA: FAILED' /tmp/cw-tampered-restore.out
           sudo apt-get update -qq
           sudo apt-get install -y -qq age
           age-keygen -o /tmp/crisisweave-age-key >/dev/null 2>&1
