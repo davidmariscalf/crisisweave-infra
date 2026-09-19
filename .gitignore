@@ -17,3 +17,4 @@ deploy/stack/alertmanager.generated.yml
 deploy/stack/alertmanager.generated.tmp
 .DS_Store
 __pycache__/
+dist/
