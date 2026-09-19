@@ -52,7 +52,7 @@ The stack intentionally ships with no universal/default account or token. After 
 sh bootstrap-admin.sh relief-org "Relief Organisation" admin-1 "Initial Administrator"
 ```
 
-The helper creates the organisation and admin through the platform CLI and issues an 8-hour bearer token. That token is shown once in the server terminal; store it in an appropriate secret/password manager and do not put it in source control or chat.
+The helper calls the platform's atomic `bootstrap` operation, so organisation, first admin and initial 8-hour bearer token are created in one transaction. If bootstrap fails, it does not leave a partial admin/token behind. The token is shown once in the server terminal; store it in an appropriate secret/password manager and do not put it in source control or chat.
 
 ## Runtime hardening
 
@@ -79,7 +79,7 @@ backup_dir="$(sh backup.sh)"
 sh restore-drill.sh "$backup_dir"
 ```
 
-`backup.sh` uses SQLite's online backup API for `platform.db`, `private.db` and `worksites.db`, runs `PRAGMA integrity_check`, writes SHA256 checksums, records the pinned application revisions and seals both ordered audit histories in `AUDIT_SEALS.json`. The three database files are individually transactionally valid snapshots; they are not presented as a distributed cross-service transaction.
+`backup.sh` uses SQLite's online backup API for `platform.db`, `private.db` and `worksites.db`, runs `PRAGMA integrity_check`, writes SHA256 checksums, records the exact application revisions from `release-pins.json` and seals both ordered audit histories in `AUDIT_SEALS.json`. The three database files are individually transactionally valid snapshots; they are not presented as a distributed cross-service transaction.
 
 `restore-drill.sh` verifies every file hash, both audit chains, required audit immutability triggers and SQLite integrity while opening the snapshots read-only. It deliberately never writes into live Docker volumes.
 
@@ -99,7 +99,7 @@ Litestream/restic remain useful for continuous or provider-specific replication.
 
 ## Verified updates
 
-Application build contexts in `compose.yaml` are pinned to reviewed Git commit SHAs. Do not deploy `main`, a branch name or a floating tag directly.
+Application build contexts in `compose.yaml` are pinned to reviewed Git commit SHAs. `release-pins.json` is the canonical application revision manifest, and `check-release-pins.py` makes CI/runtime verification fail if Compose, override examples, backup metadata or the bootstrap helper drift from it. Do not deploy `main`, a branch name or a floating tag directly.
 
 After a candidate infrastructure commit has a successful `backend-stack` GitHub Actions run, apply that exact 40-character SHA with:
 
