@@ -42,7 +42,7 @@ services:
 
   platform:
     build:
-      context: ${CW_PLATFORM_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-platform.git#5512a4581f3aa58cffdcb1eff28fef4826079136}
+      context: ${CW_PLATFORM_GIT_CONTEXT:-https://github.com/davidmariscalf/crisisweave-platform.git#6cfe69bad9b044174d66d63a77e1d1419aef71be}
     restart: unless-stopped
     init: true
     depends_on:
