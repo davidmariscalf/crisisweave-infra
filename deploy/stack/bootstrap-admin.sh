@@ -23,8 +23,10 @@ for required in docker; do
   command -v "$required" >/dev/null 2>&1 || { echo "$required is required" >&2; exit 1; }
 done
 
-docker compose exec -T platform python crisisweave_platform.py create-org "$org_id" "$org_name"
-docker compose exec -T platform python crisisweave_platform.py create-principal "$admin_id" --org "$org_id" --name "$admin_name" --role admin
-
-printf '%s\n' 'Administrator created. The next JSON contains the bearer token once:'
-docker compose exec -T platform python crisisweave_platform.py issue-token "$admin_id" --ttl-hours 8
+printf '%s\n' 'Bootstrapping organisation and first administrator atomically. The next JSON contains the bearer token once:'
+docker compose exec -T platform python crisisweave_platform.py bootstrap \
+  --org-id "$org_id" \
+  --org-name "$org_name" \
+  --admin-id "$admin_id" \
+  --admin-name "$admin_name" \
+  --ttl-hours 8
