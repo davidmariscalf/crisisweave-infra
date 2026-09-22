@@ -97,6 +97,24 @@ and publishes `dist/`. The builder copies the public site and stamps both `build
 
 This makes a deployed public site traceable back to reviewed source without embedding credentials in the repository.
 
+### Deploying from a different Netlify account
+
+The Netlify account does not need to be the account that created the current public site. A different account can deploy the same reviewed build safely as long as it:
+
+1. connects GitHub and is granted access to `davidmariscalf/crisisweave-infra`;
+2. creates a site from this repository, using the repository root as the base;
+3. lets `netlify.toml` run `python scripts/build-site.py` and publish `dist/`;
+4. deploys the exact reviewed `main` revision rather than uploading an unstamped folder;
+5. verifies the result with:
+
+```bash
+python scripts/verify-deploy.py https://YOUR-SITE.netlify.app --expected-revision "$(git rev-parse HEAD)"
+```
+
+The default `crisisweave.netlify.app` subdomain is already owned by the existing Netlify project. A second account must use a different temporary `*.netlify.app` name unless the existing site is transferred, renamed, or the custom domain is moved deliberately.
+
+If the canonical public URL changes, set the GitHub repository variable `CW_PUBLIC_SITE_URL` to the new HTTPS origin so the scheduled uptime/provenance workflow checks the new deployment.
+
 ### Manual Drop fallback
 
 If Netlify Drop is used, build the stamped directory first:
