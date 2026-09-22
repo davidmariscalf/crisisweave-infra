@@ -11,6 +11,8 @@ on:
     - cron: '17 */6 * * *'
 permissions:
   contents: read
+env:
+  CW_PUBLIC_SITE_URL: ${{ vars.CW_PUBLIC_SITE_URL || 'https://crisisweave.netlify.app' }}
 concurrency:
   group: crisisweave-public-uptime
   cancel-in-progress: true
@@ -21,21 +23,36 @@ jobs:
     steps:
       - name: Check homepage content
         run: |
-          curl --fail --silent --show-error --location --max-time 20 https://crisisweave.netlify.app/ | grep -q '<title>CrisisWeave</title>'
+          curl --fail --silent --show-error --location --max-time 20 ${{ env.CW_PUBLIC_SITE_URL }}/ | grep -q '<title>CrisisWeave</title>'
 
-      - name: Check health metadata
+      - name: Check deployed provenance metadata
         run: |
-          curl --fail --silent --show-error --location --max-time 20 https://crisisweave.netlify.app/health.json | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"]=="ok" and d["synthetic_demo_only"] is True'
+          base="${CW_PUBLIC_SITE_URL%/}"
+          curl --fail --silent --show-error --location --max-time 20 "$base/build.json" -o /tmp/cw-build.json
+          curl --fail --silent --show-error --location --max-time 20 "$base/health.json" -o /tmp/cw-health.json
+          python - <<'PY'
+          import json, re
+          build=json.load(open('/tmp/cw-build.json'))
+          health=json.load(open('/tmp/cw-health.json'))
+          revision=build.get('source_revision','')
+          assert re.fullmatch(r'[0-9a-f]{40}', revision), build
+          assert build.get('service') == 'crisisweave-public-site', build
+          assert build.get('source_repository') == 'https://github.com/davidmariscalf/crisisweave-infra', build
+          assert health.get('source_revision') == revision, (build, health)
+          assert health.get('status') == 'ok', health
+          assert health.get('synthetic_demo_only') is True, health
+          print(revision)
+          PY
 
       - name: Check security contact
         run: |
-          body="$(curl --fail --silent --show-error --location --max-time 20 https://crisisweave.netlify.app/.well-known/security.txt)"
+          body="$(curl --fail --silent --show-error --location --max-time 20 ${{ env.CW_PUBLIC_SITE_URL }}/.well-known/security.txt)"
           printf '%s' "$body" | grep -q '^Contact: mailto:'
           printf '%s' "$body" | grep -q '^Policy: https://github.com/davidmariscalf/crisisweave-platform/blob/main/SECURITY.md$'
 
       - name: Check security headers
         run: |
-          headers="$(curl --fail --silent --show-error --head --max-time 20 https://crisisweave.netlify.app/)"
+          headers="$(curl --fail --silent --show-error --head --max-time 20 ${{ env.CW_PUBLIC_SITE_URL }}/)"
           printf '%s\n' "$headers" | grep -qi '^x-content-type-options: nosniff'
           printf '%s\n' "$headers" | grep -qi '^x-frame-options: DENY'
           printf '%s\n' "$headers" | grep -qi '^referrer-policy: strict-origin-when-cross-origin'
@@ -44,6 +61,6 @@ jobs:
 
       - name: Check GitHub redirect rule
         run: |
-          headers="$(curl --silent --show-error --head --max-time 20 https://crisisweave.netlify.app/github)"
+          headers="$(curl --silent --show-error --head --max-time 20 ${{ env.CW_PUBLIC_SITE_URL }}/github)"
           printf '%s\n' "$headers" | grep -Eq '^HTTP/[^ ]+ 30[1278]'
           printf '%s\n' "$headers" | grep -qi '^location: https://github.com/davidmariscalf/CrisisWeave'
