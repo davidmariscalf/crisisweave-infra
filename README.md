@@ -6,7 +6,7 @@ This repository is deliberately safe to make public. It contains deployment meta
 
 ## Public endpoints
 
-- Netlify origin: `https://crisisweave.netlify.app`
+- Netlify origin: `https://opencrisisweave.netlify.app`
 - Requested public alias: `https://crisisweave.owns.it.com`
 - Domain request: `https://github.com/domainsproject/register/pull/191`
 
