@@ -32,6 +32,8 @@ jobs:
           test -f site/coordinator-demo.html
           test -f site/coordinator-demo.js
           test -f netlify.toml
+          test -f scripts/build-site.py
+          test -f scripts/verify-deploy.py
           test -f .env.example
           test -f ecosystem/components.lock.json
           test -f ecosystem/README.md
@@ -54,6 +56,7 @@ jobs:
 
       - name: Build revision-stamped public site
         run: |
+          python -m py_compile scripts/build-site.py scripts/check-secrets.py scripts/verify-deploy.py
           python scripts/build-site.py --revision "$GITHUB_SHA"
           python - <<'PY'
           import json, os, re
