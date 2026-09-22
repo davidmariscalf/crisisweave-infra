@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 env:
-  CW_PUBLIC_SITE_URL: ${{ vars.CW_PUBLIC_SITE_URL || 'https://crisisweave.netlify.app' }}
+  CW_PUBLIC_SITE_URL: ${{ vars.CW_PUBLIC_SITE_URL || 'https://opencrisisweave.netlify.app' }}
 concurrency:
   group: crisisweave-public-uptime
   cancel-in-progress: true
