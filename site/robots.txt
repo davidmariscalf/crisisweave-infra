@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://crisisweave.netlify.app/sitemap.xml
+Sitemap: https://opencrisisweave.netlify.app/sitemap.xml
